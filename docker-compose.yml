@@ -1,0 +1,10 @@
+version: "3.9"
+
+services:
+  semi_supervised_learning:
+    build: .
+    container_name: semi_supervised_learning
+    volumes:
+      - /c:/work
+    tty: true
+    stdin_open: true
