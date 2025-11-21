@@ -1,2 +1,2 @@
-# GNN-Few-shot-classification
+# Félig felügyelt tanulás/Semi-supervised learning
 Diplomaterv
