@@ -23,7 +23,7 @@ def create_edge_index(knn):
     edge_index = torch.stack([row, col], dim=0)
     return edge_index.long()
 	
-def graph_creating(latens_vectors, neighb_method, p=2, batch_size = 32):
+def graph_creating(latens_vectors, neighb_method, p=2):
   if neighb_method == 'cosine':
     top_neighbours = cosine_similarity_index(latens_vectors)
   elif neighb_method == 'p_norm':
