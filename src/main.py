@@ -1,83 +1,68 @@
+from xml.parsers.expat import model
 import torch
 import torch.nn.functional as F
 # Metódusok kidolgozása
 import numpy as np
 from CNNAutocoder import CNNAutoCoder
+from FewShotModel import FewShotModel
 from GCN_model import GCN
-from preprocessing import MNIST_data_loading
+from preprocessing import MNIST_data_loading, dataLoading_MNIST, traindatasetMasking
 from graph_tools import graph_creating
 
 
 
 def main():
-	device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 	max_image_labeled_class = [1,2,5,10,20,50,100] # How many labeled images are in each classes.
+	#validation_size = 1200
+	test_size = 100
 	K = 3 #How many edges does have each nodes? (KNN)
+	lr = 0.01
 	method_similar = 'p_norm'
-	p = 2
-	epochs_max = 1000
-	#epochs = np.arange(epochs_max+1, step=10)[1:]
-	#patience = 150
-	#accuses = []
-	
-	train_data, test_data = MNIST_data_loading()
-	
-	test_images = test_data.data.unsqueeze(1).float() / 255.0
-	test_images = test_images.to(device)
-	test_targets = test_data.targets
-	test_targets = test_targets.to(device)
+	#p_n_vectors = [1,2,3]
+
+	epochs_max = 2500
+	epochs = np.arange(epochs_max+1, step=10)[1:] # Adott epoch-ban megnézi, hogy mennyire javult a modellt pontosség metrikával
+		
+	device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+	train_x, train_y, test_x, test_y, class_num, channel_size = dataLoading_MNIST()
+	train_x_filtered, train_y_filtered = traindatasetMasking(train_x, train_y, class_num, 1)
+
+	test_x_filtered = test_x[:test_size]
+	test_y_filtered = test_y[:test_size]
+
+	best_results = []
 
 	for max_label in max_image_labeled_class:
 		print(max_label)
 		#Tanító halmaz maszkolása
-		indexs = np.arange(len(train_data))
-		train_targets_index_bool = [train_data.targets==target for target in range(10)]# Choosing X images from each classes as labeled
-		train_targets_indexs = [np.asarray(indexs[index_bool]) for index_bool in train_targets_index_bool]
-		train_mask_index = np.hstack(np.array([train_targets_indexs[target][:max_label] for target in range(10)])) #Labeling
+		train_x_filtered, train_y_filtered = traindatasetMasking(train_x, train_y, class_num, max_label)
+		train_test_x = torch.cat((train_x_filtered, test_x_filtered))
+		train_test_y = torch.cat((train_y_filtered, test_y_filtered))
 
-		train_images = train_data.data[train_mask_index].unsqueeze(1).float() / 255.0
-		train_images = train_images.to(device)
-		train_targets = train_data.targets[train_mask_index]
-		train_targets = train_targets.to(device)
-
-
-		modelAutocoder = CNNAutoCoder(1).to(device) # 64 jellemzővel tér vissza
-		modelGNN = GCN(64, 10).to(device)
-
-		optimizerGNN = torch.optim.Adam(modelGNN.parameters(), lr=0.01)
-		optimizerAutoEncoder = torch.optim.Adam(modelAutocoder.parameters(), lr=0.01)
+		model = FewShotModel(input_size=28, output_size=class_num, latens_size = 64, channel_size = channel_size, device = device)
+		optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+		best_acc = -1
+		best_epoch = -1
+		
 		for epoch in range(epochs_max+1):
-			modelAutocoder.train()
-			modelGNN.train()
-
-			optimizerGNN.zero_grad()
-			optimizerAutoEncoder.zero_grad()
-			train_test_images =  torch.cat((train_images, test_images), dim=0).to(device)
-			train_test_latens_vectors = modelAutocoder(train_test_images).to(device)
-			train_mask_index = torch.arange(len(train_images)).to(device)
-			#train_latens_vectors = modelAutocoder(train_images).to(device)
-			#test_latens_vectors = modelAutocoder(test_images).to(device)
-			#tr_te_latens_vectors = torch.cat((train_latens_vectors, test_latens_vectors), dim=0).to(device)
-			full_graph = graph_creating(train_test_latens_vectors, method_similar, p=p).to(device)
-			out = modelGNN(full_graph).to(device)
-
-			loss = F.cross_entropy(out[train_mask_index], train_targets)
+			model.train()
+			optimizer.zero_grad()
+			output = model(train_test_x.to(device), method_similar, 2)
+			loss = F.cross_entropy(output[:len(train_y_filtered)], train_y_filtered.to(device))
 			loss.backward()
+			optimizer.step()
 
-			optimizerGNN.step()
-			optimizerAutoEncoder.step()
+			if epoch in epochs:
+				with torch.no_grad():
+					model.eval()
+					out = model(test_x_filtered, method_similar, 2)
+					pred = out.argmax(dim=1)
+					correct = pred.eq(test_y_filtered).sum().item()
+					acc = correct / len(test_y_filtered)
+					if acc > best_acc:
+						best_acc = acc
+						best_epoch = epoch
 
-			#print(f"Epoch {epoch+1}")
-			#print(f"Training loss: {loss.item():.4f}")
-		modelAutocoder.eval()
-		modelGNN.eval()
-		test_latens_vectors = modelAutocoder(test_images)
-		test_graph = graph_creating(test_latens_vectors, method_similar, p = p)
-		out = modelGNN(test_graph)
-		pred = out.argmax(dim=1)
-		correct = pred.eq(test_targets).sum().item()
-		acc = correct / len(test_targets)
-		print(f"Accuracy: {acc:.4f}")
-	
 if "__main__"==__name__:
 	main()

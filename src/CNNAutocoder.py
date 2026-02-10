@@ -3,7 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 
 
-class CNNAutoCoder(nn.Module):
+class CNNModel(nn.Module):
     def __init__(self, channel_size):
         super().__init__()
         self.conv1 = nn.Conv2d(channel_size, 32,  kernel_size=3, stride=2, padding=1) # 14 x 14

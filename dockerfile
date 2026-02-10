@@ -12,15 +12,8 @@ RUN pip install --no-cache-dir \
     torchaudio==2.8.0 \
     --index-url https://download.pytorch.org/whl/cu126
 
-RUN pip install --no-cache-dir \
-    pyg_lib \
-    torch_scatter \
-    torch_sparse \
-    torch_cluster \
-    torch_spline_conv \
-    -f https://data.pyg.org/whl/torch-2.8.0+cu126.html
-
 RUN pip install torch_geometric
+RUN pip install mednist
 
 COPY src /workspace/src
 
