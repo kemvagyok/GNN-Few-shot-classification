@@ -1,9 +1,11 @@
-FROM pytorch/pytorch:2.8.0-cuda12.6-cudnn9-devel
+FROM pytorch/pytorch:2.8.0-cuda12.6-cudnn9-runtime
 
 # Munka könyvtár
 WORKDIR /workspace
 
-RUN apt-get update
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends git && \
+    rm -rf /var/lib/apt/lists/*
 
 RUN pip install --no-cache-dir numpy pandas
 
@@ -13,8 +15,7 @@ RUN pip install --no-cache-dir \
     --index-url https://download.pytorch.org/whl/cu126
 
 RUN pip install torch_geometric
-RUN pip install mednist
-
+RUN pip install medmnist
 COPY src /workspace/src
 
 # Bash legyen az alapértelmezett

@@ -1,12 +1,9 @@
-from xml.parsers.expat import model
 import torch
 import torch.nn.functional as F
 # Metódusok kidolgozása
 import numpy as np
-from CNNAutocoder import CNNAutoCoder
 from FewShotModel import FewShotModel
-from GCN_model import GCN
-from preprocessing import MNIST_data_loading, dataLoading_MNIST, traindatasetMasking
+from preprocessing import dataLoading_MNIST, traindatasetMasking
 from graph_tools import graph_creating
 
 
@@ -63,6 +60,9 @@ def main():
 					if acc > best_acc:
 						best_acc = acc
 						best_epoch = epoch
+
+		best_results.append((max_label, best_acc, best_epoch))
+
 
 if "__main__"==__name__:
 	main()
