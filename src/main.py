@@ -37,7 +37,7 @@ def main():
 		train_test_x = torch.cat((train_x_filtered, test_x_filtered))
 		train_test_y = torch.cat((train_y_filtered, test_y_filtered))
 
-		model = FewShotModel(input_size=28, output_size=class_num, latens_size = 64, channel_size = channel_size, device = device)
+		model = FewShotModel(input_size=28, output_size=class_num, latens_size = 64, channel_size = channel_size, device = device).to(device)
 		optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 		best_acc = -1
 		best_epoch = -1
