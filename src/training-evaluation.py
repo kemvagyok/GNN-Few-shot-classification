@@ -1,25 +1,18 @@
 import torch
 import torch.nn.functional as F
+from tqdm import tqdm
 # Metódusok kidolgozása
-from FewShotModel import FewShotModel
+from models import FewShotModel
 from preprocessing import dataLoading_MNIST, traindatasetMasking
-from graph_tools import graph_creating
 #---
 import numpy as np
 import pandas as pd
+#---
+import config
 
 
 def main():
-	max_image_labeled_class = [1,2,5,10,20,50,100] # How many labeled images are in each classes.
-	#validation_size = 1200
-	test_size = 100
-	K = 3 #How many edges does have each nodes? (KNN)
-	lr = 0.01
-	method_similar = 'p_norm'
-	#p_n_vectors = [1,2,3]
-
-	epochs_max = 2500
-	epochs = np.arange(epochs_max+1, step=10)[1:] # Adott epoch-ban megnézi, hogy mennyire javult a modellt pontosság metrikával
+	epochs = np.arange(config.epochs_max+1, step=10)[1:] # Adott epoch-ban megnézi, hogy mennyire javult a modellt pontosság metrikával
 		
 	device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -28,13 +21,12 @@ def main():
 
 	train_x_filtered = train_x_filtered.to(device)
 	train_y_filtered = train_y_filtered.to(device)
-	test_x_filtered = test_x[:test_size].to(device)
-	test_y_filtered = test_y[:test_size].to(device)
+	test_x_filtered = test_x[:config.test_size].to(device)
+	test_y_filtered = test_y[:config.test_size].to(device)
 
 	best_results = []
 
-	for max_label in max_image_labeled_class:
-		print(max_label)
+	for max_label in config.train_images_per_class:
 		#Tanító halmaz maszkolása
 		train_x_filtered, train_y_filtered = traindatasetMasking(train_x, train_y, class_num, max_label)
 		
@@ -42,14 +34,14 @@ def main():
 		train_test_y = torch.cat((train_y_filtered.to(device), test_y_filtered.to(device)))
 
 		model = FewShotModel(input_size=28, output_size=class_num, latens_size = 64, channel_size = channel_size, device = device).to(device)
-		optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+		optimizer = torch.optim.Adam(model.parameters(), lr=config.lr)
 		best_acc = -1
 		best_epoch = -1
 		
-		for epoch in range(epochs_max+1):
+		for epoch in tqdm(range(config.epochs_max+1), ascii=True, desc=f"max_label: {max_label}"):
 			model.train()
 			optimizer.zero_grad()
-			output = model(train_test_x.to(device), method_similar, 2).to(device)
+			output = model(train_test_x.to(device), config.method_similar, 2).to(device)
 			loss = F.cross_entropy(output[:len(train_y_filtered)].to(device), train_y_filtered.to(device))
 			loss.backward()
 			optimizer.step()
@@ -57,7 +49,7 @@ def main():
 			if epoch in epochs:
 				with torch.no_grad():
 					model.eval()
-					out = model(test_x_filtered, method_similar, 2).to(device)
+					out = model(test_x_filtered, config.method_similar, 2).to(device)
 					pred = out.argmax(dim=1)
 					correct = pred.eq(test_y_filtered.to(device)).sum().item()
 					acc = correct / len(test_y_filtered)
