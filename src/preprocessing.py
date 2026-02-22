@@ -28,6 +28,7 @@ def dataLoading_MNIST():
   #return (train_dataset, test_dataset, n_classes, n_channels)
   return (train_x, train_y, test_x, test_y, n_classes, n_channels)
 
+
 def dataLoading_medMNIST():
   data_flag = 'dermamnist'
   download = True
@@ -84,15 +85,20 @@ class FewShotDataset(Dataset):
 
 
 # SAMPLES, CHANNELS, HEIGHT, WIDTH <- TRAIN_X
-def traindatasetMasking(train_x, train_y, class_num, max_size_as_class):
+def traindatasetMasking(train_x, train_y, num_class, max_size_as_class):
+
 
   indexs = np.arange(train_x.shape[0])
 
-  train_targets_index_bool = [train_y == y for y in range(class_num)]# Choosing X images from each classes as labeled
+  train_targets_index_bool = [train_y == y for y in range(num_class)]# Choosing X images from each classes as labeled
 
   train_targets_indexs = [np.asarray(indexs[index_bool]) for index_bool in train_targets_index_bool]
 
-  train_mask_index = np.hstack(np.array([train_targets_indexs[target][:max_size_as_class] for target in range(class_num)])) #Labeling
+  for c in range(num_class):
+      assert len(train_targets_indexs[c]) >= max_size_as_class, \
+          f"Class {c} has only {len(train_targets_indexs[c])} samples, but max_size_as_class={max_size_as_class}"
+
+  train_mask_index = np.hstack(np.array([train_targets_indexs[target][:max_size_as_class] for target in range(num_class)])) #Labeling
 
   train_x_filtered = train_x[train_mask_index]
   train_y_filtered = train_y[train_mask_index]
