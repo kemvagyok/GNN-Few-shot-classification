@@ -32,7 +32,7 @@ class CNNModel(nn.Module):
     
 
 
-class GCN(torch.nn.Module):
+class GCNModel(torch.nn.Module):
   def __init__(self,num_features, num_classes):
     super().__init__()
     self.conv1 = GCNConv(
@@ -48,19 +48,6 @@ class GCN(torch.nn.Module):
     x = F.relu(x)
     x = F.dropout(x, training=self.training)
     x = self.conv2(x, edge_index)
-    return x
-  
-  
-class FewShotModel(nn.Module):
-  def __init__(self, input_size, output_size, latens_size, channel_size , device):
-    super(FewShotModel, self).__init__()
-    self.encoder = CNNModel(channel_size = channel_size).to(device)
-    self.classifier = GCN(latens_size, output_size).to(device)
-  def forward(self, x, method_similar, p_n):
-    x = self.encoder(x)
-    x = graph_creating(x, method_similar, p_n)
-    #loader = NeighborLoader(data = x,input_nodes=torch.arange(x.num_nodes, device=device),num_neighbors = 20)
-    x = self.classifier(x)
     return x
 
 

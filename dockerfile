@@ -14,9 +14,16 @@ RUN pip install --no-cache-dir \
     torchaudio==2.8.0 \
     --index-url https://download.pytorch.org/whl/cu126
 
+RUN pip install --no-cache-dir \
+      pyg_lib \
+      torch_scatter \
+      torch_sparse \
+      -f https://data.pyg.org/whl/torch-2.8.0+cu126.html
+	  
 RUN pip install torch_geometric
 RUN pip install medmnist
+RUN pip install faiss-cpu
 COPY src /workspace/src
 
 # Bash legyen az alapértelmezett
-CMD ["python","src/main.py"]
+CMD ["python","src/training-evaluation.py"]
