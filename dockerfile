@@ -20,9 +20,11 @@ RUN pip install --no-cache-dir \
       torch_sparse \
       -f https://data.pyg.org/whl/torch-2.8.0+cu126.html
 	  
+	  
 RUN pip install torch_geometric
 RUN pip install medmnist
 RUN pip install faiss-cpu
+RUN pip install pyyaml
 COPY src /workspace/src
 
 # Bash legyen az alapértelmezett
