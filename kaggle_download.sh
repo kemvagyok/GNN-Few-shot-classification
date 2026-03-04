@@ -1,13 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=few_shot_gnn_c_gnnsb2
+#SBATCH --job-name=kaggle_download_c_gnnsb2
 #SBATCH --partition=gpu
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:0
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=8G
 #SBATCH --time=00:30:00
 #SBATCH --output=logs/%x_%j.log
-#SBATCH --mail-type=ALL
-#SBATCH --mail-user=0322sagibenedek@gmail.com
 
 set -euo pipefail
 
@@ -25,4 +23,4 @@ module load singularity
 srun singularity exec --nv \
   --bind ${PROJECT_DIR}:/workspace \
   ${SIF} \
-  bash -lc "cd /workspace/src && python -u training-evaluation.py"
+  bash -lc "cd /workspace/src && python -u kaggle_download.py"

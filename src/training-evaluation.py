@@ -48,29 +48,44 @@ def main():
 
 
 			train_mask = torch.zeros(len(train_test_y), dtype=torch.bool)
-			train_mask[:len(train_x_filtered)] = True
-	
+			#TRAIN+TEST SIZE MASK, TRUE for train, FALSE for test
+			train_mask[:len(train_x_filtered)] = True 
+			test_mask = ~train_mask
 
 			cnn = CNNModel(channel_size = channel_size).to(device)
 			gcn = GCNModel(num_features = config.latens_size, num_classes = num_class).to(device)
 			opt_cnn = torch.optim.Adam(cnn.parameters(), lr=config.lr_cnn)
 			opt_gcn = torch.optim.Adam(gcn.parameters(), lr=config.lr_gcn)
 
-			latens = cnn(train_test_x)
-
-			databaseVector = faiss.IndexFlatL2(latens.shape[1])
-			latens_cpu = latens.detach().cpu().numpy()
+			latens = cnn(train_test_x).detach()
+			latens_cpu = latens.detach().cpu().numpy() # FAISS CPU-ra várja a bemenetet
+			
+			databaseVector = faiss.IndexFlatL2(latens_cpu.shape[1]) # Hány dimenzió a latens tér
 			databaseVector.add(latens_cpu)
-			top_neighbours = databaseVector.search(latens_cpu, config.K_neigh+1)[1]
-			top_neighbours = top_neighbours[:,1:]
 
+			top_neighbours = databaseVector.search(latens_cpu, config.K_neigh+1)[1][:,1:] # K_neigh+1, mert a legközelebbi szomszéd maga a pont, amit keresünk, azt kihagyjuk
 
-			top_neighbours = torch.asarray(top_neighbours).to(device)
+			top_neighbours = torch.tensor(top_neighbours, device = device)
 			edge_index = create_edge_index(top_neighbours).to(device)
+			
 			data = Data(x = latens, edge_index = edge_index).to(device)
 			data.num_classes = num_class
 			data.y = train_test_y
 			data.train_mask = train_mask.to(device)
+			data.test_mask = ~train_mask.to(device)
+
+
+			#root_node_idx = random.choice(range(len(train_x_filtered)))#!!!!!!
+
+			loader = NeighborLoader(
+				data,
+				num_neighbors = [config.K_neigh] * K_hop,
+				#input_nodes = torch.tensor([root_node_idx], device=device),
+				input_nodes = train_mask,
+				shuffle = True
+			)
+
+			#subgraph = next(iter(loader))
 
 			best_acc = -1
 			best_epoch = -1
@@ -78,72 +93,85 @@ def main():
 			print(f"\nTrain size: {len(train_x_filtered)}, Test size: {len(test_y_filtered)}")
 
 			for epoch in tqdm(range(config.epochs_max+1), ascii=True, desc=f"Max labeled train image size: {max_label}", disable=False):
+				if epoch % config.graph_refresh == 0:
+					with torch.no_grad():
+						cnn.eval()
+
+						latens = cnn(train_test_x.to(device))
+						latens_cpu = latens.detach().cpu().numpy()
+
+						databaseVector.reset()
+						databaseVector.add(latens_cpu)
+						D, I = databaseVector.search(latens_cpu, config.K_neigh+1)
+						neighbors = torch.tensor(I[:,1:], device=device)
+						
+						edge_index = create_edge_index(neighbors).to(device)
+						data.edge_index = edge_index
+						data.x = latens
+						loader = NeighborLoader(
+							data,
+							num_neighbors = [config.K_neigh] * K_hop,
+							input_nodes = train_mask,
+							shuffle = True
+						)
+
+				
 				cnn.train()
 				gcn.train()
 
-				opt_cnn.zero_grad()
-				opt_gcn.zero_grad()
+				for subgraph in loader:
+					opt_cnn.zero_grad() 
+					opt_gcn.zero_grad()
 
-				root_node_idx = random.choice(range(len(train_x_filtered)))
+					subimages = train_test_x[subgraph.n_id]
+					sublatens = cnn(subimages)
+					subgraph.x = sublatens
+					preds = gcn(subgraph) # Belső, 4.lépés
+					train_mask_sub = subgraph.train_mask
+					#print("Train nodes in batch:", train_mask_sub.sum().item())
+					#loss = F.cross_entropy(preds[data.train_mask[subgraph.n_id]], subgraph.y[data.train_mask[subgraph.n_id]]) # Only calculate loss on labeled data
+					loss = F.cross_entropy(preds[train_mask_sub], subgraph.y[train_mask_sub]) # Only calculate loss on labeled data
 
-				loader = NeighborLoader(
-					data,
-					num_neighbors = [config.K_neigh] * K_hop,
-					input_nodes = torch.tensor([root_node_idx], device=device),
-					shuffle = False,
-				)
-				
-				subgraph = next(iter(loader))
-				subimages = train_test_x[subgraph.n_id]
-				sublatens = cnn(subimages)
-				subgraph.x = sublatens
+					loss.backward()
+					opt_cnn.step()
+					opt_gcn.step()
 
-				preds = gcn(subgraph) # Belső, 4.lépés
-				loss = F.cross_entropy(preds[data.train_mask[subgraph.n_id]], subgraph.y[data.train_mask[subgraph.n_id]]) # Only calculate loss on labeled data
 
-				loss.backward()
-				opt_cnn.step()
-				opt_gcn.step()
 
-				if epoch % config.graph_refresh == 0:
-					with torch.no_grad():
-						latens = cnn(train_test_x.to(device))
-						databaseVector.reset()
-						databaseVector.add(latens.cpu().numpy())
-						D, I = databaseVector.search(latens.cpu().numpy(), config.K_neigh+1)
-						neighbors = torch.tensor(I[:,1:], device=device)
-						edge_index = create_edge_index(neighbors).to(device)
-						data.edge_index = edge_index
 				if epoch in epochs:
 					with torch.no_grad():
 						cnn.eval()
 						gcn.eval()
 
 						# 1. CNN embedding
+						#latens_test = cnn(train_test_x.to(device))
 						latens_test = cnn(test_x_filtered.to(device))
-						index = faiss.IndexFlatL2(latens_test.shape[1])
-						index.add(latens_test.cpu().numpy())
+						latens_test_cpu = latens_test.detach().cpu().numpy()
+						
+						index = faiss.IndexFlatL2(latens_test_cpu.shape[1])
+						index.add(latens_test_cpu)
 
-						D, I = index.search(latens_test.cpu().numpy(), config.K_neigh+1)
+						D, I = index.search(latens_test_cpu, config.K_neigh+1)
 
 						neighbors_test = torch.tensor(I[:,1:], device=device)
 						edge_index_test = create_edge_index(neighbors_test).to(device)
 
-
 						data_test = Data(
-							x=latens_test,
-							edge_index=edge_index_test
+							x = latens_test,
+							edge_index = edge_index_test
 						).to(device)
 						# 3. GNN forward
-						out = gcn(data_test)
+						out = gcn(data_test) # Only test nodes
 
 						# 4. Accuracy
+						#pred = out[test_mask].argmax(dim=1)
 						pred = out.argmax(dim=1)
+						#acc = (pred == train_test_y[test_mask].to(device)).float().mean().item()
 						acc = (pred == test_y_filtered.to(device)).float().mean().item()
 						if acc > best_acc:
 							best_acc = acc
 							best_epoch = epoch
-
+							print(f"New best accuracy: {best_acc:.4f} at epoch {best_epoch} with max_label {max_label}")
 			best_results.append((max_label, best_acc, best_epoch))
 	
 			
