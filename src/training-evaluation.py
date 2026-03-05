@@ -32,9 +32,9 @@ def main():
 	test_x_filtered = test_x[:config.test_size].to(device)
 	test_y_filtered = test_y[:config.test_size].to(device)
 
+	best_results = []
 
 	for K_hop in config.K_hop_list:
-		best_results = []
 		print("" + "="*50)
 		print(f"Training with K_hop: {K_hop} and K_neigh: {config.K_neigh}")
 		print("" + "="*50)
@@ -57,6 +57,8 @@ def main():
 			opt_cnn = torch.optim.Adam(cnn.parameters(), lr=config.lr_cnn)
 			opt_gcn = torch.optim.Adam(gcn.parameters(), lr=config.lr_gcn)
 
+
+			cnn.eval()
 			latens = cnn(train_test_x).detach()
 			latens_cpu = latens.detach().cpu().numpy() # FAISS CPU-ra várja a bemenetet
 			
@@ -81,7 +83,8 @@ def main():
 				data,
 				num_neighbors = [config.K_neigh] * K_hop,
 				#input_nodes = torch.tensor([root_node_idx], device=device),
-				input_nodes = train_mask,
+				input_nodes = data.train_mask,
+				batch_size = config.batch_size,
 				shuffle = True
 			)
 
@@ -93,6 +96,8 @@ def main():
 			print(f"\nTrain size: {len(train_x_filtered)}, Test size: {len(test_y_filtered)}")
 
 			for epoch in tqdm(range(config.epochs_max+1), ascii=True, desc=f"Max labeled train image size: {max_label}", disable=False):
+
+				
 				if epoch % config.graph_refresh == 0:
 					with torch.no_grad():
 						cnn.eval()
@@ -111,7 +116,9 @@ def main():
 						loader = NeighborLoader(
 							data,
 							num_neighbors = [config.K_neigh] * K_hop,
-							input_nodes = train_mask,
+							#input_nodes = torch.tensor([root_node_idx], device=device),
+							input_nodes = data.train_mask,
+							batch_size = config.batch_size,
 							shuffle = True
 						)
 
@@ -128,10 +135,7 @@ def main():
 					subgraph.x = sublatens
 					preds = gcn(subgraph) # Belső, 4.lépés
 					train_mask_sub = subgraph.train_mask
-					#print("Train nodes in batch:", train_mask_sub.sum().item())
-					#loss = F.cross_entropy(preds[data.train_mask[subgraph.n_id]], subgraph.y[data.train_mask[subgraph.n_id]]) # Only calculate loss on labeled data
 					loss = F.cross_entropy(preds[train_mask_sub], subgraph.y[train_mask_sub]) # Only calculate loss on labeled data
-
 					loss.backward()
 					opt_cnn.step()
 					opt_gcn.step()
@@ -144,40 +148,35 @@ def main():
 						gcn.eval()
 
 						# 1. CNN embedding
-						#latens_test = cnn(train_test_x.to(device))
-						latens_test = cnn(test_x_filtered.to(device))
-						latens_test_cpu = latens_test.detach().cpu().numpy()
-						
-						index = faiss.IndexFlatL2(latens_test_cpu.shape[1])
-						index.add(latens_test_cpu)
+						latens_all = cnn(test_x_filtered.to(device))  # Csak a teszt adatokra számoljuk ki a latens reprezentációkat
 
-						D, I = index.search(latens_test_cpu, config.K_neigh+1)
+						# KNN keresés a teljes halmazon
+						index = faiss.IndexFlatL2(latens_all.shape[1])
+						index.add(latens_all.cpu().numpy())
+						D, I = index.search(latens_all.cpu().numpy(), config.K_neigh+1)
 
 						neighbors_test = torch.tensor(I[:,1:], device=device)
 						edge_index_test = create_edge_index(neighbors_test).to(device)
-
 						data_test = Data(
-							x = latens_test,
+							x = latens_all,
 							edge_index = edge_index_test
 						).to(device)
 						# 3. GNN forward
-						out = gcn(data_test) # Only test nodes
+						out = gcn(data_test)
 
 						# 4. Accuracy
-						#pred = out[test_mask].argmax(dim=1)
 						pred = out.argmax(dim=1)
-						#acc = (pred == train_test_y[test_mask].to(device)).float().mean().item()
 						acc = (pred == test_y_filtered.to(device)).float().mean().item()
 						if acc > best_acc:
 							best_acc = acc
 							best_epoch = epoch
-							print(f"New best accuracy: {best_acc:.4f} at epoch {best_epoch} with max_label {max_label}")
-			best_results.append((max_label, best_acc, best_epoch))
-	
+							#print(f"New best accuracy: {best_acc:.4f} at epoch {best_epoch} with max_label {max_label}")
+
+			best_results.append((K_hop, max_label, best_acc, best_epoch))
 			
-		results_df = pd.DataFrame(best_results, columns=["max_label", "best_acc", "best_epoch"])
-		file_name = f"../results/{config.CHOSE_DATASET}_results_{config.K_neigh}k_{K_hop}h_{config.epochs_max}e.csv"
-		results_df.to_csv(file_name, index=False)
+	results_df = pd.DataFrame(best_results, columns=["K_hop", "max_label", "best_acc", "best_epoch"])
+	file_name = f"../results/{config.CHOSE_DATASET}_results_{config.K_neigh}_h_{config.epochs_max}e.csv"
+	results_df.to_csv(file_name, index=False)
 
 if __name__ == "__main__":
 	config = Config()
