@@ -9,7 +9,7 @@ from tqdm import tqdm
 # Metódusok kidolgozása
 from graph_tools import create_edge_index
 from models import CNNModel, GCNModel
-from preprocessing import dataLoading_MNIST, traindatasetMasking
+from loadingModule import dataLoading_MNIST, dataLoading_ChestX, traindatasetFiltering
 import config_summary
 #---
 import numpy as np
@@ -27,7 +27,8 @@ def main():
 		
 	device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-	train_x, train_y, test_x, test_y, num_class, channel_size = dataLoading_MNIST()
+	#train_x, train_y, test_x, test_y, num_class, channel_size = dataLoading_MNIST()
+	train_x, train_y, test_x, test_y, num_class, channel_size = dataLoading_ChestX()
 
 	test_x_filtered = test_x[:config.test_size].to(device)
 	test_y_filtered = test_y[:config.test_size].to(device)
@@ -40,9 +41,12 @@ def main():
 		print("" + "="*50)
 
 		for max_label in config.train_images_per_class:
-			#Tanító halmaz maszkolása 
-			train_x_filtered, train_y_filtered = traindatasetMasking(train_x, train_y, num_class, max_label)
+			#Tanító halmaz szűrése, hogy csak max_label darab kép legyen egy osztályból 
+			train_mask_index = traindatasetFiltering(train_y, num_class, max_label)
 			
+			train_x_filtered = train_x[train_mask_index].to(device)
+			train_y_filtered = train_y[train_mask_index].to(device)
+
 			train_test_x = torch.cat((train_x_filtered.to(device), test_x_filtered.to(device)))
 			train_test_y = torch.cat((train_y_filtered.to(device), test_y_filtered.to(device)))
 

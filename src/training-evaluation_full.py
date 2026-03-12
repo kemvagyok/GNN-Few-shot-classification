@@ -16,7 +16,6 @@ from config import Config
 
 def main():
     config = Config()
-    
     # Adott epoch-ban megnézi, hogy mennyire javult a modell pontossága
     epochs = np.arange(config.epochs_max+1, step=10)[1:] 
         
@@ -97,14 +96,14 @@ def main():
                 with torch.no_grad():
                     # Transzduktív kiértékelés: Nem építünk új gráfot, 
                     # használjuk a meglévő hálózatot a teszt elemek előrejelzésére.
-                    latens_val = cnn(train_test_x)
+                    latens_val = cnn(test_x_filtered)  # Csak a teszt adatokra számoljuk ki a latens reprezentációkat
                     data_val = Data(x=latens_val, edge_index=edge_index)
                     
                     out = gcn(data_val) 
                     
                     # Predikció és pontosság számítás csak a teszt adatokon
-                    pred_classes = out[test_mask].argmax(dim=1)
-                    acc = (pred_classes == train_test_y[test_mask]).float().mean().item()
+                    pred_classes = out.argmax(dim=1)
+                    acc = (pred_classes == test_y_filtered).float().mean().item()
                     
                     if acc > best_acc:
                         best_acc = acc

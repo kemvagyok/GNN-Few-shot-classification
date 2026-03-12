@@ -1,106 +1,108 @@
+import os
 import torch
 import numpy as np
-from torch.utils.data import Dataset
-from torchvision import datasets
-from torchvision.transforms import ToTensor
-from medmnist import PathMNIST, ChestMNIST, DermaMNIST, INFO, Evaluator
-
-def dataLoading_MNIST():
-  transform = ToTensor()
-  train_dataset = datasets.MNIST('./data',
-                              train=True,
-                              download=True,
-                              transform=transform)
-  test_dataset = datasets.MNIST('./data',
-                                train=False,
-                                download=True,
-                                transform=transform)
-
-  n_classes = len(train_dataset.classes)
-  n_channels = 1
-
-  #--- Train
-  train_x = train_dataset.data.unsqueeze(1) / 255
-  train_y = train_dataset.targets
-  #--- Test
-  test_x = test_dataset.data.unsqueeze(1) / 255
-  test_y = test_dataset.targets
-  #return (train_dataset, test_dataset, n_classes, n_channels)
-  return (train_x, train_y, test_x, test_y, n_classes, n_channels)
+import pandas as pd
+from PIL import Image
+from sklearn.preprocessing import MultiLabelBinarizer
+from torchvision import transforms
 
 
-def dataLoading_medMNIST():
-  data_flag = 'dermamnist'
-  download = True
+def _build_transform(image_size: int, grayscale: bool):
+    ops = [
+        transforms.Resize((image_size, image_size)),
+        transforms.ToTensor(),          # [0,255] → [0.0,1.0], [C,H,W]
+    ]
+    if grayscale:
+        # ToTensor() után 1 csatorna van; normalizálás 1 csatornás statisztikával
+        ops.append(transforms.Normalize(mean=[0.5], std=[0.5]))
+    else:
+        ops.append(transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                         std=[0.229, 0.224, 0.225]))
+    return transforms.Compose(ops)
 
-  info = INFO[data_flag]
-  #task = info['task']
+def fileLoading_ChestX(
+        image_dir="data/nih_chest_xray/images",
+        csv_path="data/nih_chest_xray/Data_Entry_2017.csv",
+        train_index_path = "data/nih_chest_xray/train_val_list.txt",
+        test_index_path = "data/nih_chest_xray/test_list.txt",
+        img_size = 28,
+        max_samples_per_class = None,
+        train_files_size = 100,
+        test_files_size = 100,
+        isMultilabel = False,
+        grayscale = True):
 
-  n_classes = len(info['label'])
-  n_channels = info['n_channels']
+    df = pd.read_csv(csv_path, usecols=["Image Index", "Finding Labels"])
+    df = df.rename(columns = 
+        {"Image Index" : "img_idx",
+         "Finding Labels" : "labels"})
+    df["labels"] =  df["labels"].str.split("|")
+    #df["labels_list"] = df["Finding Labels"].str.split("|").apply(lambda tags: [t.strip() for t in tags])
+    classes = df["labels"].apply(lambda tags: [t.strip() for t in tags]).explode().unique()
+    
+    label2idx = {label: idx for idx, label in enumerate(classes)}
 
-
-  transform = ToTensor()
-
-  train_dataset = DermaMNIST(split="train",
-                             download=True,
-                             size = 28,
-                             transform=transform)
-  test_dataset = DermaMNIST(split="test",
-                            download=True,
-                            size = 28,
-                            transform=transform)
-  #------ train
-  train_x = train_dataset.imgs
-  train_x = torch.asarray(train_x, dtype = torch.float32).permute(0,3,1,2) / 255
-
-  train_y = train_dataset.labels
-  train_y = train_y.reshape(len(train_y))
-  train_y = torch.asarray(train_y)
-
-  #------ test
-  test_x = test_dataset.imgs
-  test_x = torch.asarray(test_x, dtype = torch.float32).permute(0,3,1,2) / 255
-
-  test_y = test_dataset.labels
-  test_y = test_y.reshape(len(test_y))
-  test_y = torch.asarray(test_y)
+    if isMultilabel:
+        df["labels"] = df["labels"].apply(lambda labels: [label2idx[label] for label in labels])
+        mlb = MultiLabelBinarizer()
+        df["labels"] = mlb.fit_transform(df["labels"])
+    else:
+        df["labels"] = df["labels"][:].apply(lambda labels: label2idx.get(labels[0]))
+    
 
 
-  #return (train_dataset, test_dataset, n_classes, n_channels)
-  return (train_x, train_y, test_x, test_y, n_classes, n_channels)
+    train_index = pd.read_csv(train_index_path, header = None)
+    test_index = pd.read_csv(test_index_path, header = None)
 
 
 
-class FewShotDataset(Dataset):
-  def __init__(self, x, y):
-    self.x = x
-    self.y = y
+    train_df = df[df["img_idx"].isin(train_index.iloc[:, 0])]
+    test_df = df[df["img_idx"].isin(test_index.iloc[:, 0])]
 
-  def __len__(self):
-    return len(self.x)
+    train_tensors = []
+    train_targets = []
+    test_tensors = []
+    test_targets = []
+    tf = _build_transform(img_size, grayscale)
+    def images_load(df, size):
+        tensors = [] 
+        targets = []
+        for row in df[:size].itertuples():
+            img_path = os.path.join(image_dir, row.img_idx)
+            img = Image.open(img_path).convert("L" if grayscale else "RGB")
+            img = tf(img)
+            tensors.append(img)
+            targets.append(row.labels)
+        return tensors, targets
+    
 
-  def __getitem__(self, idx):
-     return self.x[idx], self.y[idx]
+    train_tensors, train_targets = images_load(train_df, train_files_size)
+    test_tensors, test_targets = images_load(test_df, test_files_size)
+
+    train_x = torch.stack(train_tensors, dim = 0)
+    test_x = torch.stack(test_tensors, dim = 0)
+    if not grayscale:
+        train_x = train_x.permute(0,3,1,2)
+        test_x = test_x.permute(0,3,1,2)
+        
+    train_y = torch.tensor(train_targets)
+    test_y = torch.tensor(test_targets)
+
+    n_classes = len(classes)
+    n_channels = 1 if grayscale else 3
+    
+    return (train_x, train_y, test_x, test_y, n_classes, n_channels)
 
 
-# SAMPLES, CHANNELS, HEIGHT, WIDTH <- TRAIN_X
-def traindatasetMasking(train_x, train_y, num_class, max_size_as_class):
-
-
-  indexs = np.arange(train_x.shape[0])
-
-  train_targets_index_bool = [train_y == y for y in range(num_class)]# Choosing X images from each classes as labeled
-
-  train_targets_indexs = [np.asarray(indexs[index_bool]) for index_bool in train_targets_index_bool]
-
-  for c in range(num_class):
-      assert len(train_targets_indexs[c]) >= max_size_as_class, \
-          f"Class {c} has only {len(train_targets_indexs[c])} samples, but max_size_as_class={max_size_as_class}"
-
-  train_mask_index = np.hstack(np.array([train_targets_indexs[target][:max_size_as_class] for target in range(num_class)])) #Labeling
-
-  train_x_filtered = train_x[train_mask_index]
-  train_y_filtered = train_y[train_mask_index]
-
-  return train_x_filtered, train_y_filtered
+if __name__ == "__main__":
+    print("Starting data preprocessing for ChestX dataset...")
+    train_x, train_y, test_x, test_y, n_classes, n_channels = fileLoading_ChestX()
+    torch.save({
+    "train_x": train_x,
+    "train_y": train_y,
+    "test_x": test_x,
+    "test_y": test_y,
+    "n_classes": n_classes,
+    "n_channels": n_channels
+}, "data/nih_chest_xray/ChestX_data.pt")
+    print("Data preprocessing completed for ChestX dataset.")
