@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=few_shot_gnn_c_gnnsb2
+#SBATCH --job-name=preprocessing_chestx
 #SBATCH --partition=gpu
-#SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=4
+#SBATCH --gres=gpu:0
+#SBATCH --cpus-per-task=6
 #SBATCH --mem=8G
-#SBATCH --time=00:30:00
-#SBATCH --output=logs/%x_%j.log
+#SBATCH --time=02:00:00
+#SBATCH --output=/project/c_gnn42/few_shot_dipterv/GNN-Few-shot-classification/logs/%x_%j.log
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=0322sagibenedek@gmail.com
 
@@ -22,7 +22,7 @@ echo "Container: ${SIF}"
 
 module load singularity
 
-srun singularity exec --nv \
+singularity exec --nv \
   --bind ${PROJECT_DIR}:/workspace \
   ${SIF} \
-  bash -lc "cd /workspace/src && python -u training-evaluation.py"
+  bash -lc "cd /workspace/src && python preprocessing.py --train_files_size 4000 --test_files_size 4000"
