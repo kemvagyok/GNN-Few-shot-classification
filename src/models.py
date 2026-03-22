@@ -5,10 +5,48 @@ from torchvision import models
 from torch_geometric.nn import GCNConv
 from torch_geometric.data import Data
 
+import torch
+import torch.nn as nn
+from torchvision import models
 
+class ResNetModel(nn.Module):
+    def __init__(self, output_dim=64, in_channels=3):
+        super().__init__()
 
+        resnet = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
 
+        # --- 1) Első Conv módosítása (1 vagy 3 csatorna, tetszőleges inputméret) ---
+        old_conv = resnet.conv1
+        resnet.conv1 = nn.Conv2d(
+            in_channels,
+            old_conv.out_channels,
+            kernel_size=old_conv.kernel_size,
+            stride=old_conv.stride,
+            padding=old_conv.padding,
+            bias=False
+        )
 
+        # Ha 1 csatorna esetén a súlyokat is szeretnéd átlagolni:
+        if in_channels == 1:
+            resnet.conv1.weight.data = old_conv.weight.data.mean(dim=1, keepdim=True)
+
+        # --- 2) Fix avgpool helyett AdaptiveAvgPool: bármekkora inputra jó ---
+        resnet.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+
+        # --- 3) Utolsó FC eltávolítása ---
+        self.features = nn.Sequential(*list(resnet.children())[:-1])
+        self.fc = nn.Linear(resnet.fc.in_features, output_dim)
+
+    def forward(self, x):
+        x = self.features(x)          # (B, 512, 1, 1)
+        x = x.view(x.size(0), -1)
+        x = self.fc(x)
+        return x
+    
+
+'''
+parameters: channel_size
+'''
 class CNNModel(nn.Module):
     def __init__(self, channel_size):
         super().__init__()
@@ -20,7 +58,8 @@ class CNNModel(nn.Module):
         self.bn3 = nn.BatchNorm2d(128)
         self.conv4 = nn.Conv2d(128, 256, kernel_size=2, stride=2, padding=1) # 3 x 3
         self.bn4 = nn.BatchNorm2d(256)
-        self.fc = nn.Linear(256* 3* 3, 64)
+        self.pool = nn.AdaptiveAvgPool2d((1, 1))    
+        self.fc = nn.Linear(256* 1 * 1, 64)
 
     def forward(self, x):
         x = self.conv1(x)
@@ -35,6 +74,7 @@ class CNNModel(nn.Module):
         x = self.conv4(x)
         x = self.bn4(x)
         x = F.relu(x)
+        x = self.pool(x)
         x = torch.flatten(x, 1)
         x = self.fc(x)
 

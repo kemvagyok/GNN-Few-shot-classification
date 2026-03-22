@@ -1,15 +1,73 @@
+# =========================================================
+# STANDARD LIBRARIES
+# =========================================================
 import os
-from PIL import Image
-import torch
+
+# =========================================================
+# THIRD-PARTY LIBRARIES
+# =========================================================
 import numpy as np
 import pandas as pd
+import torch
+from PIL import Image
+
 from torch.utils.data import Dataset
 from torchvision import datasets
 from torchvision.transforms import ToTensor
-from medmnist import PathMNIST, ChestMNIST, DermaMNIST, INFO, Evaluator
-from preprocessing import _build_transform, fileLoading_ChestX
 
- 
+"""
+from medmnist import (
+    PathMNIST,
+    ChestMNIST,
+    DermaMNIST,
+    INFO,
+    Evaluator
+)
+"""
+# =========================================================
+# PROJECT MODULES
+# =========================================================
+from preprocessing import build_transform, ISIC2019Dataset, ChestXDataset
+
+# =========================================================
+# UTILITIES
+# =========================================================
+from collections import Counter
+
+def get_class_distribution(targets, num_classes=None):
+    """
+    targets: torch.Tensor vagy numpy array (N,)
+    """
+    if isinstance(targets, torch.Tensor):
+        targets = targets.cpu().numpy()
+
+    counter = Counter(targets)
+
+    if num_classes is not None:
+        return {i: counter.get(i, 0) for i in range(num_classes)}
+
+    return dict(counter)
+
+def get_multilabel_distribution(targets):
+    """
+    targets: (N, C) multi-hot tensor
+    """
+    if isinstance(targets, torch.Tensor):
+        targets = targets.cpu().numpy()
+
+    return targets.sum(axis=0)
+
+def print_distribution(dist, title="Distribution"):
+    print(f"\n--- {title} ---")
+    total = sum(dist.values()) if isinstance(dist, dict) else dist.sum()
+
+    if isinstance(dist, dict):
+        for k, v in dist.items():
+            print(f"Class {k}: {v} ({v/total:.2%})")
+    else:
+        for i, v in enumerate(dist):
+            print(f"Class {i}: {v} ({v/total:.2%})")
+
 '''
 Filtering the training dataset to have at most max_size_as_class samples per class.
 '''
@@ -22,40 +80,121 @@ def traindatasetFiltering(targets, num_class, max_size_as_class):
     
     for c in range(num_class):
         np.random.shuffle(train_targets_indexs[c]) # Randomly shuffle the indices of each class to ensure random sampling
-        assert len(train_targets_indexs[c]) >= max_size_as_class, \
-          f"Class {c} has only {len(train_targets_indexs[c])} samples, but max_size_as_class={max_size_as_class}"
+        #assert len(train_targets_indexs[c]) >= max_size_as_class, \
+        if len(train_targets_indexs[c]) >= max_size_as_class:
+            print(f"Class {c} has only {len(train_targets_indexs[c])} samples, but max_size_as_class={max_size_as_class}")
     
-    train_mask_index = np.hstack(np.array([train_targets_indexs[target][:max_size_as_class] for target in range(num_class)])) #Labeling
-        
+    train_mask_index = np.hstack(
+        [train_targets_indexs[target][:max_size_as_class] for target in range(num_class)]
+    )
+
     return train_mask_index
 
+def dataLoading_ISIC2019(
+        ptFile = "../data/ISIC2019/ISIC2019_data_4000_128.pt", 
+        force_reload=False,
+        **kwargs):
 
-def dataLoading_MNIST():
+        if os.path.exists(ptFile) and not force_reload:
+            print("Loading cached ISIC2019 data...")
+            data = torch.load(ptFile)
+
+            train_x, train_y, val_x, val_y, test_x, test_y, n_classes, n_channels = (
+                data["train_x"],
+                data["train_y"],
+                data["val_x"],
+                data["val_y"],
+                data["test_x"],
+                data["test_y"],
+                data["n_classes"],
+                data["n_channels"]
+            )
+            train_dist = get_class_distribution(train_y, n_classes)
+            test_dist = get_class_distribution(test_y, n_classes)
+            print_distribution(train_dist, "ISIC2019 Train")
+            print_distribution(test_dist, "ISIC2019 Test")
+            return  train_x, train_y, val_x, val_y, test_x, test_y, n_classes, n_channels
+
+        
+        print("Not found cached ISIC2019 data, loading from source... this may take a while.")
+
+        train_x, train_y, val_x, val_y, test_x, test_y, n_classes, n_channels = ISIC2019Dataset(**kwargs)
+
+        torch.save({
+            "train_x": train_x,
+            "train_y": train_y,
+            "val_x": val_x,
+            "val_y": val_y,
+            "test_x": test_x,
+            "test_y": test_y,
+            "n_classes": n_classes,
+            "n_channels": n_channels
+        }, ptFile)
+
+        train_dist = get_class_distribution(train_y, n_classes)
+        test_dist = get_class_distribution(test_y, n_classes)
+
+        print_distribution(train_dist, "ISIC2019 Train")
+        print_distribution(test_dist, "ISIC2019 Test")
+
+        return train_x, train_y, val_x, val_y, test_x, test_y, n_classes, n_channels
+        
+  
+
+def dataLoading_MNIST(val_ratio=0.1):
     grayscale = True
-    transform = _build_transform(28, grayscale)
+    transform = build_transform(28, grayscale)
     
-    train_dataset = datasets.MNIST('./data',
-                              train=True,
-                              download=True,
-                              transform=transform)
-    test_dataset = datasets.MNIST('./data',
-                                train=False,
-                                download=True,
-                                transform=transform)
+    # --- MNIST betöltés
+    train_dataset = datasets.MNIST('../data',
+                                   train=True,
+                                   download=True,
+                                   transform=transform)
+    test_dataset = datasets.MNIST('../data',
+                                  train=False,
+                                  download=True,
+                                  transform=transform)
     
     n_classes = len(train_dataset.classes)
     n_channels = 1
-    
-    #--- Train
-    train_x = train_dataset.data.unsqueeze(1) / 255
+
+    # --- Train tensorok
+    train_x = train_dataset.data.unsqueeze(1) / 255.0
     train_y = train_dataset.targets
-    #--- Test
-    test_x = test_dataset.data.unsqueeze(1) / 255
+
+    # --- Test tensorok
+    test_x = test_dataset.data.unsqueeze(1) / 255.0
     test_y = test_dataset.targets
-    
-    return (train_x, train_y, test_x, test_y, n_classes, n_channels)
 
+    # --- Train --> Train + Val split (tensor alapú, nem Subset!)
+    num_train = len(train_x)
+    num_val = int(num_train * val_ratio)
 
+    # Reprodukálható shuffle
+    perm = torch.randperm(num_train)
+
+    val_idx = perm[:num_val]
+    train_idx = perm[num_val:]
+
+    # Train split
+    train_x_split = train_x[train_idx]
+    train_y_split = train_y[train_idx]
+
+    # Val split
+    val_x = train_x[val_idx]
+    val_y = train_y[val_idx]
+
+    # --- Print distributions
+    print_distribution(get_class_distribution(train_y_split, n_classes), "MNIST Train")
+    print_distribution(get_class_distribution(val_y,           n_classes), "MNIST Val")
+    print_distribution(get_class_distribution(test_y,          n_classes), "MNIST Test")
+
+    return (train_x_split, train_y_split,
+            val_x, val_y,
+            test_x, test_y,
+            n_classes, n_channels)
+
+'''
 def dataLoading_medMNIST():
     data_flag = 'dermamnist'
     download = True
@@ -94,40 +233,51 @@ def dataLoading_medMNIST():
     test_y = torch.asarray(test_y)
     
     return (train_x, train_y, test_x, test_y, n_classes, n_channels)
-
+'''
 def dataLoading_ChestX(
-        ptFile = "data/nih_chest_xray/ChestX_data.pt", 
+        ptFile = "../data/ChestX/ChestX_data_4000_128.pt", 
         force_reload=False,
+        img_size = 28,
         **kwargs
         ):
     
-    grayscale = True
-    transform = _build_transform(28, grayscale)
-
+    
     if os.path.exists(ptFile) and not force_reload:
+        print("Loading cached ChestX data...")
         data = torch.load(ptFile)
         return (
             data["train_x"],
             data["train_y"],
+            data["val_x"],
+            data["val_y"],
             data["test_x"],
             data["test_y"],
             data["n_classes"],
             data["n_channels"]
         )
     
-    train_x, train_y, test_x, test_y, n_classes, n_channels = fileLoading_ChestX(
-        transform=transform,
+    print("Not found cached ChestX data, loading from source... this may take a while.")
+    
+    train_x, train_y, val_x, val_y, test_x, test_y, n_classes, n_channels = ChestXDataset(
         **kwargs
     )
 
     torch.save({
         "train_x": train_x,
         "train_y": train_y,
+        "val_x": val_x,
+        "val_y": val_y,
         "test_x": test_x,
         "test_y": test_y,
         "n_classes": n_classes,
         "n_channels": n_channels
     }, ptFile)
+
+    train_dist = get_class_distribution(train_y, n_classes)
+    test_dist = get_class_distribution(test_y, n_classes)
+
+    print_distribution(train_dist, "ChestX Train")
+    print_distribution(test_dist, "ChestX Test")
 
     return train_x, train_y, test_x, test_y, n_classes, n_channels
 
@@ -141,10 +291,4 @@ class FewShotDataset(Dataset):
     return len(self.x)
 
   def __getitem__(self, idx):
-     return self.x[idx], self.y[idx]
-
-
-
-if __name__ == "__main__":
-    dataLoading_ChestX()
-    
+     return self.x[idx], self.y[idx]    
