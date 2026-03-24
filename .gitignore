@@ -188,3 +188,4 @@ cython_debug/
 /results
 /containers
 /scripts
+/wandb
