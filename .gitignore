@@ -183,4 +183,8 @@ cython_debug/
 
 
 #Data
-data
+/data
+/logs
+/results
+/containers
+/scripts

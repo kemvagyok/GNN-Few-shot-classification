@@ -44,12 +44,12 @@ def create_edge_index(knn):
     return edge_index.long()
 
 
-def graph_creating(latens_vectors, neighb_method, p=2):
+def graph_creating(latens_vectors, neighb_method, num_classes, p=2):
   if neighb_method == 'cosine':
     top_neighbours = cosine_similarity_index_chunked(latens_vectors)
   elif neighb_method == 'p_norm':
     top_neighbours = p_norm_distance_index(latens_vectors, p=p)
   edge_index = create_edge_index(top_neighbours)
   data = Data(x= latens_vectors, edge_index=edge_index)
-  data.num_classes = 10
+  data.num_classes = num_classes
   return data
