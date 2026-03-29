@@ -5,7 +5,8 @@ import pandas as pd
 from PIL import Image
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MultiLabelBinarizer
-from torchvision import transforms
+from .baseImageDataset import BaseImageDataset
+from .baseTextDataset import BaseTextDataset
 
 import argparse
 
@@ -33,22 +34,12 @@ def apply_remedial(df, label_cols):
 
     return pd.concat([safe, maj_only, min_only], ignore_index=True)
 
-def build_transform(img_size=28, grayscale=True):
 
-    mean, std = ([0.5], [0.5]) if grayscale else (
-        [0.485, 0.456, 0.406],
-        [0.229, 0.224, 0.225]
-    )
-
-    return transforms.Compose([
-    transforms.Resize((img_size, img_size)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean, std)
-    ])
-
-class BaseDataset:
-    def __init__(self, path, img_size=28, grayscale=True):
-        self.path = os.path.join(path, "raw")
+"""
+class BaseImageDataset:
+    def __init__(self, path_raw, img_size=28, grayscale=True):
+        self.path = path_raw
+        self.img_dir = os.path.join(path_raw, "images")
         self.img_size = img_size
         self.grayscale = grayscale
         self.transform = build_transform(img_size=img_size, grayscale=grayscale)
@@ -71,27 +62,35 @@ class BaseDataset:
         )
 
         return train_p, val_p, test_p, train_y, val_y, test_y
-
-class ISIC2019Dataset(BaseDataset):
-    def __init__(self, img_dir, **kwargs):
+"""
+class ISIC2019Dataset(BaseImageDataset):
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.root_dir = img_dir
+        self.csv_path = os.path.join(self.path, "ISIC_2019_Training_GroundTruth.csv")
 
     def load(self, train_size=4000, test_size=4000):
+        df = pd.read_csv(self.csv_path)
 
-        classes = sorted(d for d in os.listdir(self.root_dir)
-                         if os.path.isdir(os.path.join(self.root_dir, d)))
-
-        class_to_idx = {c: i for i, c in enumerate(classes)}
+        # class nevek (oszlopok a képen kívül)
+        classes = list(df.columns[1:])
+        print("Classes:", classes)
 
         paths, labels = [], []
 
-        for c in classes:
-            folder = os.path.join(self.root_dir, c)
-            for f in os.listdir(folder):
-                if f.endswith((".jpg", ".png")):
-                    paths.append(os.path.join(folder, f))
-                    labels.append(class_to_idx[c])
+        for _, row in df.iterrows():
+            img_name = row["image"]
+
+            # label = one-hot → index
+            label = np.argmax(row[classes].values)
+
+            # fájl elérési út
+            img_path = os.path.join(self.img_dir, img_name + ".jpg")
+
+            if os.path.exists(img_path):
+                paths.append(img_path)
+                labels.append(label)
+            else:
+                print(f"Missing: {img_path}")
 
         paths = np.array(paths)
         labels = np.array(labels)
@@ -114,20 +113,15 @@ class ISIC2019Dataset(BaseDataset):
 
         return train_x, train_y, val_x, val_y, test_x, test_y, len(classes), (1 if self.grayscale else 3)
     
-class ChestXDataset(BaseDataset):
-    def __init__(self, 
-                 img_dir, 
-                 csv_path, 
-                 train_index_path, 
-                 test_index_path, 
+class ChestXDataset(BaseImageDataset):
+    def __init__(self,
                  multilabel=False, 
                  **kwargs):
-        
+    
         super().__init__(**kwargs)
-        self.image_dir = img_dir
-        self.csv_path = csv_path
-        self.train_index_path = train_index_path
-        self.test_index_path = test_index_path
+        self.csv_path = os.path.join(self.path, "Data_Entry_2017.csv")
+        self.train_index_path = os.path.join(self.path, "train_val_list.txt")
+        self.test_index_path = os.path.join(self.path, "test_list.txt")
         self.multilabel = multilabel
 
     def load(self, train_size=4000, test_size=4000):
@@ -179,7 +173,7 @@ def load_dataset(name, **kwargs):
 if __name__ == "__main__":
 
     parsers =argparse.ArgumentParser()
-    parsers.add_argument("-dataset", type=str, default="ChestX", help="Dataset to preprocess (e.g., 'ChestX')")
+    parsers.add_argument("-dataset", type=str, default="ISIC2019", help="Dataset to preprocess (e.g., 'ChestX')")
     parsers.add_argument("--train_size", type=int, default=4000, help="Number of training files to process")
     parsers.add_argument("--test_size", type=int, default=4000, help="Number of testing files to process")
     parsers.add_argument("--img_size", type=int, default=128, help="Size of the images")
@@ -191,13 +185,13 @@ if __name__ == "__main__":
 
     print(f"Starting data preprocessing for {dataset_name} dataset...")
 
-    dataset = load_dataset(dataset_name, img_size=img_size, grayscale=True)
+    dataset = load_dataset(dataset_name, img_size=img_size, grayscale=True, path_raw=f"./data/raw/{dataset_name}")
 
     train_x, train_y, val_x, val_y, test_x, test_y, n_classes, n_channels = dataset.load(
         train_size=train_files_size,
         test_size=test_files_size,
     )
-    pt_filename = f"../data/{dataset_name}/{dataset_name}_data_{train_files_size}_{img_size}.pt"
+    pt_filename = f"./data/preprocessed/{dataset_name}_data_{train_files_size}_{img_size}.pt"
 
     torch.save({
         "train_x": train_x,

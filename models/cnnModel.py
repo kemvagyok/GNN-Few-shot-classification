@@ -3,7 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 
 class cnnModel(nn.Module):
-    def __init__(self, channel_size):
+    def __init__(self, output_dim, channel_size):
         super().__init__()
         self.conv1 = nn.Conv2d(channel_size, 32,  kernel_size=3, stride=2, padding=1) # 14 x 14
         self.bn1 = nn.BatchNorm2d(32)
@@ -14,7 +14,7 @@ class cnnModel(nn.Module):
         self.conv4 = nn.Conv2d(128, 256, kernel_size=2, stride=2, padding=1) # 3 x 3
         self.bn4 = nn.BatchNorm2d(256)
         self.pool = nn.AdaptiveAvgPool2d((1, 1))    
-        self.fc = nn.Linear(256* 1 * 1, 64)
+        self.fc = nn.Linear(256* 1 * 1, output_dim)
 
     def forward(self, x):
         x = self.conv1(x)

@@ -18,26 +18,14 @@ from torchvision.transforms import ToTensor
 # =========================================================
 # PROJECT MODULES
 # =========================================================
-from .preprocessing import build_transform, ISIC2019Dataset, ChestXDataset
+from .preprocessing import ISIC2019Dataset, ChestXDataset
+
+from .baseImageDataset import build_transform
 
 # =========================================================
 # UTILITIES
 # =========================================================
 from collections import Counter
-
-def get_class_distribution(targets, num_classes=None):
-    """
-    targets: torch.Tensor vagy numpy array (N,)
-    """
-    if isinstance(targets, torch.Tensor):
-        targets = targets.cpu().numpy()
-
-    counter = Counter(targets)
-
-    if num_classes is not None:
-        return {i: counter.get(i, 0) for i in range(num_classes)}
-
-    return dict(counter)
 
 def get_multilabel_distribution(targets):
     """
@@ -48,16 +36,7 @@ def get_multilabel_distribution(targets):
 
     return targets.sum(axis=0)
 
-def print_distribution(dist, title="Distribution"):
-    print(f"\n--- {title} ---")
-    total = sum(dist.values()) if isinstance(dist, dict) else dist.sum()
 
-    if isinstance(dist, dict):
-        for k, v in dist.items():
-            print(f"Class {k}: {v} ({v/total:.2%})")
-    else:
-        for i, v in enumerate(dist):
-            print(f"Class {i}: {v} ({v/total:.2%})")
 
 '''
 Filtering the training dataset to have at most max_size_as_class samples per class.
@@ -103,10 +82,7 @@ def dataLoading_ISIC2019(
                 data["n_classes"],
                 data["n_channels"]
             )
-            train_dist = get_class_distribution(train_y, n_classes)
-            test_dist = get_class_distribution(test_y, n_classes)
-            print_distribution(train_dist, "ISIC2019 Train")
-            print_distribution(test_dist, "ISIC2019 Test")
+
             return  train_x, train_y, val_x, val_y, test_x, test_y, n_classes, n_channels
   
         print("Not found cached ISIC2019 data, loading from source... this may take a while.")
@@ -126,12 +102,6 @@ def dataLoading_ISIC2019(
             "n_classes": n_classes,
             "n_channels": n_channels
         }, ptFile)
-
-        train_dist = get_class_distribution(train_y, n_classes)
-        test_dist = get_class_distribution(test_y, n_classes)
-
-        print_distribution(train_dist, "ISIC2019 Train")
-        print_distribution(test_dist, "ISIC2019 Test")
 
         return train_x, train_y, val_x, val_y, test_x, test_y, n_classes, n_channels
         
@@ -183,17 +153,11 @@ def dataLoading_ChestX(
         "n_channels": n_channels
     }, ptFile)
 
-    train_dist = get_class_distribution(train_y, n_classes)
-    test_dist = get_class_distribution(test_y, n_classes)
-
-    print_distribution(train_dist, "ChestX Train")
-    print_distribution(test_dist, "ChestX Test")
-
     return train_x, train_y, test_x, test_y, n_classes, n_channels
 
 
 
-def dataLoading_MNIST(data_pth,val_ratio=0.1):
+def dataLoading_MNIST(data_pth,val_ratio=0.1, **kwargs):
     grayscale = True
     transform = build_transform(28, grayscale)
     data_pth = os.path.join(data_pth, "raw", "MNIST", "raw")
@@ -235,11 +199,6 @@ def dataLoading_MNIST(data_pth,val_ratio=0.1):
     # Val split
     val_x = train_x[val_idx]
     val_y = train_y[val_idx]
-
-    # --- Print distributions
-    print_distribution(get_class_distribution(train_y_split, n_classes), "MNIST Train")
-    print_distribution(get_class_distribution(val_y,           n_classes), "MNIST Val")
-    print_distribution(get_class_distribution(test_y,          n_classes), "MNIST Test")
 
     return (train_x_split, train_y_split,
             val_x, val_y,

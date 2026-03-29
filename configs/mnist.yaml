@@ -6,7 +6,7 @@ paths:
 dataset:
   dataset_name: "MNIST"  # "ISIC2019", "ChestX", "MNIST"
   #train_images_per_class: [1, 2, 5, 10, 20, 50, 100]
-  train_images_per_class: [100]
+  train_images_per_class: [1, 2, 5, 10, 20, 50, 100]
   validation_size: 1200
   test_size: 4000
   use_minibatch: false
@@ -19,6 +19,7 @@ graph:
   rebuild_graph_each_epoch: true
 
 training:
+  embedding: "resnet18" #vanilia, resnet18
   lr_cnn: 0.01
   lr_gcn: 0.01
   epochs_max: 2500

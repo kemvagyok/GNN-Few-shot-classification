@@ -1,14 +1,15 @@
 import torch
 from torch import nn
 from torchvision import models
+import torch.nn.functional as F
 
 class resnetModel(nn.Module):
     def __init__(self, output_dim=64, in_channels=3, version = 18):
         super().__init__()
         if version == 18:
-            resnet = models.resnet18(weights=  models.ResNet18_Weights.DEFAULT)
+            resnet = models.resnet18(weights = None)
         elif version == 50:
-            resnet = models.resnet50(weights = models.ResNet50_Weights.DEFAULT)
+            resnet = models.resnet50(weights = None)
 
         # --- 1) Első Conv módosítása (1 vagy 3 csatorna, tetszőleges inputméret) ---
         old_conv = resnet.conv1
@@ -36,5 +37,6 @@ class resnetModel(nn.Module):
         x = self.features(x)          # (B, 512, 1, 1)
         x = x.view(x.size(0), -1)
         x = self.fc(x)
+        x = F.normalize(x, p=2, dim=1)
         return x
     
