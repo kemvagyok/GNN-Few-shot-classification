@@ -34,35 +34,6 @@ def apply_remedial(df, label_cols):
 
     return pd.concat([safe, maj_only, min_only], ignore_index=True)
 
-
-"""
-class BaseImageDataset:
-    def __init__(self, path_raw, img_size=28, grayscale=True):
-        self.path = path_raw
-        self.img_dir = os.path.join(path_raw, "images")
-        self.img_size = img_size
-        self.grayscale = grayscale
-        self.transform = build_transform(img_size=img_size, grayscale=grayscale)
-
-    def load_images(self, paths, labels):
-        imgs = []
-        for p in paths:
-            img = Image.open(p).convert("L" if self.grayscale else "RGB")
-            imgs.append(self.transform(img))
-
-        return torch.stack(imgs), torch.tensor(labels)
-
-    def split_data(self, paths, labels, test_size=0.2, val_size=0.2):
-        train_p, test_p, train_y, test_y = train_test_split(
-            paths, labels, stratify=labels, test_size=test_size, random_state=42
-        )
-
-        train_p, val_p, train_y, val_y = train_test_split(
-            train_p, train_y, test_size=val_size, random_state=42
-        )
-
-        return train_p, val_p, test_p, train_y, val_y, test_y
-"""
 class ISIC2019Dataset(BaseImageDataset):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -115,7 +86,7 @@ class ISIC2019Dataset(BaseImageDataset):
     
 class ChestXDataset(BaseImageDataset):
     def __init__(self,
-                 multilabel=False, 
+                 multilabel=False,
                  **kwargs):
     
         super().__init__(**kwargs)
@@ -166,6 +137,8 @@ def load_dataset(name, **kwargs):
         return ISIC2019Dataset(**kwargs)
     elif name == "ChestX":
         return ChestXDataset(**kwargs)
+    elif name == "AGNews":
+        return BaseTextDataset(**kwargs)
     else:
         raise ValueError(f"Unknown dataset: {name}")
 
@@ -187,6 +160,8 @@ if __name__ == "__main__":
 
     dataset = load_dataset(dataset_name, img_size=img_size, grayscale=True, path_raw=f"./data/raw/{dataset_name}")
 
+    print(f"Ending data preprocessing for {dataset_name} dataset...")
+    print(f"Saving preprocessed data for {dataset_name} dataset...")
     train_x, train_y, val_x, val_y, test_x, test_y, n_classes, n_channels = dataset.load(
         train_size=train_files_size,
         test_size=test_files_size,
@@ -204,5 +179,5 @@ if __name__ == "__main__":
         "n_channels": n_channels }, 
         pt_filename
     )
-
+    print(f"Ending preprocessed data for {dataset_name} dataset...")
     print(f"Data preprocessing completed for {dataset_name} dataset.")

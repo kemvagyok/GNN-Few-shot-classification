@@ -12,12 +12,19 @@ def build_transform(img_size=28, grayscale=True):
         [0.485, 0.456, 0.406],
         [0.229, 0.224, 0.225]
     )
+    
+    transform_list = []
 
-    return transforms.Compose([
-    transforms.Resize((img_size, img_size)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean, std)
-    ])
+    transform_list.append(transforms.Resize((img_size)))
+    transform_list.append(transforms.CenterCrop((img_size)))
+
+    if grayscale:
+        transform_list.append(transforms.Grayscale(num_output_channels=1))
+
+    transform_list.append(transforms.ToTensor())
+    transform_list.append(transforms.Normalize(mean, std))
+
+    return transforms.Compose(transform_list)
 
 class BaseImageDataset:
     def __init__(self, path_raw, img_size=28, grayscale=True):

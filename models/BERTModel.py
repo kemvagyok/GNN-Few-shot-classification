@@ -3,7 +3,7 @@ import torch.nn as nn
 from torchvision import models
 from transformers import BertTokenizer, BertModel
 
-class bertModel(nn.Module):
+class BERTModel(nn.Module):
     def __init__(self):
         super().__init__()
         self.bert = BertModel.from_pretrained("bert-base-uncased")
