@@ -4,11 +4,15 @@ paths:
   results_path: "./results"
 
 dataset:
+  dataset_type: "image"  # "image", "text"
   dataset_name: "MNIST"  # "ISIC2019", "ChestX", "MNIST"
   train_images_per_class: [1, 2, 5, 10, 20, 50, 100]
-  validation_size: 1200
-  test_size: 4000
-  use_minibatch: false
+  img_size : 28
+  test_size: 0.2
+  val_size: 0.2
+  train_file_size: -1
+  test_file_size: -1
+  use_minibatch: true
   without_valid: false
 
 graph:
@@ -18,13 +22,14 @@ graph:
   rebuild_graph_each_epoch: true
 
 training:
-  embedding: "cnn" #cnn, resnet18
-  gcn_model: "GAT" # GCN, GAT
+  embedding: "resnet18" #cnn, resnet18
+  gnn_model: "gatv2conv" #gcnconv, gatv2conv
   lr_embedder: 0.01
   lr_gcn: 0.01
   epochs_max: 2500
   batch_size: 128
-
+  criterion: "cross_entropy" # "cross_entropy", "focal_loss"
+  metrics: "accuracy" # "accuracy", "macro_f1"
 similarity:
   # method_similar: "p_norm"
   # p_n_vectors: [1, 2, 3]

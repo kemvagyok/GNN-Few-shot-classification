@@ -2,19 +2,18 @@ import torch
 from torch import nn
 from torchvision import models
 import torch.nn.functional as F
+from ..registry import register_embedding
 
-class resnetModel(nn.Module):
-    def __init__(self, output_dim=64, in_channels=3, version = 18):
+@register_embedding("resnet18")
+class Resnet18Model(nn.Module):
+    def __init__(self, output_dim=64, channel_size=3):
         super().__init__()
-        if version == 18:
-            resnet = models.resnet18(weights = None)
-        elif version == 50:
-            resnet = models.resnet50(weights = None)
+        resnet = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
 
         # --- 1) Első Conv módosítása (1 vagy 3 csatorna, tetszőleges inputméret) ---
         old_conv = resnet.conv1
         resnet.conv1 = nn.Conv2d(
-            in_channels,
+            channel_size,
             old_conv.out_channels,
             kernel_size=old_conv.kernel_size,
             stride=old_conv.stride,
@@ -23,7 +22,7 @@ class resnetModel(nn.Module):
         )
 
         # Ha 1 csatorna esetén a súlyokat is szeretnéd átlagolni:
-        if in_channels == 1:
+        if channel_size == 1:
             resnet.conv1.weight.data = old_conv.weight.data.mean(dim=1, keepdim=True)
 
         # --- 2) Fix avgpool helyett AdaptiveAvgPool: bármekkora inputra jó ---

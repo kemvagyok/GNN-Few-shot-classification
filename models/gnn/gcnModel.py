@@ -1,8 +1,10 @@
 import torch
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
+from ..registry import register_gnn
 
-class gcnModel(torch.nn.Module):
+@register_gnn("gcnconv")
+class GcnModel(torch.nn.Module):
   def __init__(self,num_features, num_classes):
     super().__init__()
     self.conv1 = GCNConv(

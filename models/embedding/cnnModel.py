@@ -1,8 +1,10 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
+from ..registry import register_embedding
 
-class cnnModel(nn.Module):
+@register_embedding("cnn")
+class CnnModel(nn.Module):
     def __init__(self, output_dim, channel_size):
         super().__init__()
         self.conv1 = nn.Conv2d(channel_size, 32,  kernel_size=3, stride=2, padding=1) # 14 x 14

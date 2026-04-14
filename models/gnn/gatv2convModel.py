@@ -1,8 +1,10 @@
 import torch
 import torch.nn.functional as F
 from torch_geometric.nn import GATv2Conv
+from ..registry import register_gnn
 
-class gatv2convModel(torch.nn.Module):
+@register_gnn("gatv2conv")
+class Gatv2convModel(torch.nn.Module):
   def __init__(self,num_features, num_classes):
     super().__init__()
     self.conv1 = GATv2Conv(

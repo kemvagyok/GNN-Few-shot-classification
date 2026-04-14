@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import faiss
 from tqdm import tqdm
+from models.embedding import cnnModel, resnet18Model
 import wandb
 from networkx import subgraph
 
@@ -35,7 +36,7 @@ from torch_geometric.loader import NeighborLoader
 from configs import Config
 
 from graph_tools import create_edge_index
-from models import cnnModel, gcnModel, resnetModel
+from models.gnn import gcnModel
 from preproccesing.loadingModule  import (
     dataLoading_MNIST,
     dataLoading_ChestX,
@@ -71,7 +72,7 @@ def checkingEmbeddingModel(data_pth):
     print("Train images shape:", train_x.shape)
     print("Train labels shape:", train_y.shape)
     model_cnn = cnnModel(channel_size=n_channels)
-    model_resnet = resnetModel(output_dim=64, in_channels=n_channels)
+    model_resnet = resnet18Model(output_dim=64, in_channels=n_channels)
     model_cnn.eval()
     model_resnet.eval()
 

@@ -4,13 +4,11 @@ paths:
   results_path: "./results"
 
 dataset:
-  dataset_type: "image"  # "image", "text"
-  dataset_name: "ISIC2019"  # "ISIC2019", "ChestX", "MNIST"
+  dataset_type: "text"  # "image", "text"
+  dataset_name: "AGNews"  # "AGNews"
   train_images_per_class: [1, 2, 5, 10, 20, 50, 100]
-  img_size : 28
+  img_size : 0
   test_size: 0.2
-  val_size: 0.2
-  files_size: 8000
   use_minibatch: true
   without_valid: false
 
@@ -21,14 +19,14 @@ graph:
   rebuild_graph_each_epoch: true
 
 training:
-  embedding: "resnet18" #cnn, resnet18
+  embedding: "bert" #bert
   gnn_model: "gatv2conv" # gcnconv, gatv2conv
   lr_embedder: 0.0003
   lr_gcn: 0.0003
   epochs_max: 2500
-  batch_size: 128
+  batch_size: 32 #Neighbor sampling
   criterion: "cross_entropy" # "cross_entropy", "focal_loss"
-  metrics: "macro_f1" # "accuracy", "macro_f1"
+  metrics: "accuracy" # "accuracy", "macro_f1"
 
 similarity:
   # method_similar: "p_norm"

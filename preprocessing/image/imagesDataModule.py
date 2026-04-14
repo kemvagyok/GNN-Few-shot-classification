@@ -1,7 +1,9 @@
+from abc import abstractmethod
 import os
 import torch
 import numpy as np
 import pandas as pd
+import tqdm
 from PIL import Image
 from sklearn.model_selection import train_test_split
 from torchvision import transforms
@@ -26,7 +28,7 @@ def build_transform(img_size=28, grayscale=True):
 
     return transforms.Compose(transform_list)
 
-class BaseImageDataset:
+class ImagesDataModule:
     def __init__(self, path_raw, img_size=28, grayscale=True):
         self.path = path_raw
         self.img_dir = os.path.join(path_raw, "images")
@@ -34,14 +36,19 @@ class BaseImageDataset:
         self.grayscale = grayscale
         self.transform = build_transform(img_size=img_size, grayscale=grayscale)
 
+    @abstractmethod
+    def load(self, train_file_size, test_file_size):
+        pass
+
     def load_images(self, paths, labels):
         imgs = []
-        for p in paths:
+        for p in tqdm.tqdm(paths):
             img = Image.open(p).convert("L" if self.grayscale else "RGB")
             imgs.append(self.transform(img))
 
         return torch.stack(imgs), torch.tensor(labels)
 
+    @staticmethod
     def split_data(self, paths, labels, test_size=0.2, val_size=0.2):
         train_p, test_p, train_y, test_y = train_test_split(
             paths, labels, stratify=labels, test_size=test_size, random_state=42
