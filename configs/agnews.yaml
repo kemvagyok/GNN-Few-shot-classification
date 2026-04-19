@@ -5,7 +5,7 @@ paths:
 
 dataset:
   dataset_type: "text"  # "image", "text"
-  dataset_name: "AGNews"  # "AGNews"
+  dataset_name: "AGNews"  # "AGNews", "DBpedia",
   train_images_per_class: [1, 2, 5, 10, 20, 50, 100]
   img_size : 0
   test_size: 0.2
@@ -14,7 +14,7 @@ dataset:
 
 graph:
   K_neigh: 3
-  K_hop_list: [1, 2, 3, 4, 5, 6]
+  K_hop_list: [1, 2, 3, 4, 5]
   graph_refresh: 10
   rebuild_graph_each_epoch: true
 
@@ -23,7 +23,7 @@ training:
   gnn_model: "gatv2conv" # gcnconv, gatv2conv
   lr_embedder: 0.0003
   lr_gcn: 0.0003
-  epochs_max: 2500
+  epochs_max: 1000
   batch_size: 32 #Neighbor sampling
   criterion: "cross_entropy" # "cross_entropy", "focal_loss"
   metrics: "accuracy" # "accuracy", "macro_f1"

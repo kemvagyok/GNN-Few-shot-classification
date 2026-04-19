@@ -44,7 +44,6 @@ class ISIC2019Dataset(ImagesDataModule):
     def load(self):
         df = pd.read_csv(self.csv_path)
         classes = list(df.columns[1:])
-
         paths, labels = [], []
 
         for _, row in df.iterrows():
@@ -58,17 +57,7 @@ class ISIC2019Dataset(ImagesDataModule):
 
         paths = np.array(paths)
         labels = np.array(labels)
-        """
-        train_p, val_p, test_p, train_y, val_y, test_y = self.split_data(paths, labels)
 
-        train_p, train_y = train_p[:train_file_size], train_y[:train_file_size]
-        val_p, val_y = val_p[:int(train_file_size * 0.4)], val_y[:int(train_file_size * 0.4)]
-        test_p, test_y = test_p[:test_file_size], test_y[:test_file_size]
-
-        train_x, train_y = self.load_images(train_p, train_y)
-        val_x, val_y = self.load_images(val_p, val_y)
-        test_x, test_y = self.load_images(test_p, test_y)
-        """
         x, y = self.load_images(paths, labels)
 
         return x, y, len(classes), (1 if self.grayscale else 3)
@@ -106,16 +95,6 @@ class ChestXDataset(ImagesDataModule):
         train_idx = pd.read_csv(self.train_index_path, header=None)[0]
         test_idx = pd.read_csv(self.test_index_path, header=None)[0]
 
-        #train_df = df[df["img"].isin(train_idx)]
-        #test_df = df[df["img"].isin(test_idx)]
-        
-        #train_df, val_df = train_df.sample(frac=0.6, random_state=42), train_df.sample(frac=0.4, random_state=42)
-        '''
-        def build(df, size):
-            paths = [os.path.join(self.img_dir, i) for i in df["img"][:size]]
-            labels = df.iloc[:size, 1:].values if self.multilabel else df["labels"][:size].tolist()
-            return self.load_images(paths, labels)
-        '''
         paths = [os.path.join(self.img_dir, i) for i in df["img"]]
         labels = df.iloc[:, 1:].values if self.multilabel else df["labels"].tolist()
         x, y = self.load_images(paths, labels)
@@ -161,26 +140,63 @@ class MNISTDataset(ImagesDataModule):
 class AGNewsDataset(TextDataModule):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.csv_path = os.path.join(self.path, "train.csv")
+        self.csv_train_path = os.path.join(self.path, "train.csv")
+        self.csv_test_path = os.path.join(self.path, "test.csv")
 
     def load(self):
-        df = pd.read_csv(self.csv_path, header=None,
-                        names=["Class Index", "Title", "Description"],
-                        skiprows=1)
+        df_train = pd.read_csv(self.csv_train_path, header=None,
+                              names=["Class Index", "Title", "Description"],
+                              skiprows=1)
+        df_test = pd.read_csv(self.csv_test_path, header=None,
+                             names=["Class Index", "Title", "Description"],
+                             skiprows=1)
+        df_train['Text'] = df_train['Title'] + " " + df_train['Description']
+        df_test['Text'] = df_test['Title'] + " " + df_test['Description']
 
-        df['Text'] = df['Title'] + " " + df['Description']
-
-        encode_texts, attention_masks = self.encode_texts(df['Text'].tolist())
+        encode_texts, attention_masks = self.encode_texts(df_train['Text'].tolist() + df_test['Text'].tolist())
 
         x = {
             "input_ids": encode_texts,
             "attention_mask": attention_masks
         }
 
-        y = torch.tensor(df['Class Index'].values) - 1
-
+        y_train = torch.tensor(df_train['Class Index'].values) - 1
+        y_test = torch.tensor(df_test['Class Index'].values) - 1
+        y = torch.cat([y_train, y_test])
         num_classes = len(y.unique())
 
+        return x, y, num_classes, None
+
+class DBpedia(TextDataModule):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Beállítjuk a fájl elérési útját (a te esetedben test.csv)
+        self.csv_train_path = os.path.join(self.path, "train.csv")
+        self.csv_test_path = os.path.join(self.path, "test.csv")
+
+    def load(self):
+        # Beolvasás a fejlécnevek alapján: 'label', 'title', 'content'
+        df_train = pd.read_csv(self.csv_train_path)
+        df_test = pd.read_csv(self.csv_test_path)
+        # Szövegek összefűzése: a 'title' és a 'content' oszlopokat használjuk
+        # (Az eredeti kódban 'Description' volt, itt 'content')
+        df_train['Text'] = df_train['title'].fillna('') + " " + df_train['content'].fillna('')
+        df_test['Text'] = df_test['title'].fillna('') + " " + df_test['content'].fillna('')
+
+        # Tokenizálás/Enkódolás (a szülőosztály self.encode_texts metódusát használva)
+        encode_texts, attention_masks = self.encode_texts(df_train['Text'].tolist() + df_test['Text'].tolist())
+
+        x = {
+            "input_ids": encode_texts,
+            "attention_mask": attention_masks
+        }
+
+        
+        combined_labels = pd.concat([df_train['label'], df_test['label']]).values
+        y = torch.tensor(combined_labels)
+        num_classes = len(y.unique())
+
+        # Visszatérünk az adatokkal (x, y, osztályok száma, validációs adatok)
         return x, y, num_classes, None
 # =========================================================
 # Factory
@@ -194,5 +210,7 @@ def get_dataset_class(name):
         return MNISTDataset
     elif name == "AGNews":
         return AGNewsDataset
+    elif name == "DBpedia":
+        return DBpedia
     else:
         raise ValueError("Unknown dataset: {}".format(name))

@@ -4,7 +4,7 @@ import torch
 from criterions import FocalLoss, effective_num_weights
 
 def build_loss(config, targets, num_classes, device):
-    if config.criterion == "focal":
+    if config.criterion == "focal_loss":
         weights = effective_num_weights(
             targets,
             num_classes=num_classes,

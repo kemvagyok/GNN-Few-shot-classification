@@ -10,7 +10,6 @@ train_x, train_y, val_x, val_y, test_x, test_y, num_class, channel_size = \
     )
 
 
-
 print_distribution(get_class_distribution(targets = train_y, num_classes = 8))
 print_distribution(get_class_distribution(targets = val_y, num_classes = 8))
 print_distribution(get_class_distribution(targets = test_y, num_classes = 8))

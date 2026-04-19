@@ -1,3 +1,5 @@
+import time
+
 import wandb
 import torch
 from torch_geometric.loader import NeighborLoader
@@ -56,9 +58,14 @@ class Trainer:
         total_loss = 0
         #MINIBATCH TRAINING: build the full graph once, then sample many small subgraphs for training
         if self.config.use_minibatch:
+            start = time.time()
             # Build graph topology only — embeddings stay on CPU, freed immediately after
             with torch.no_grad():
-                embeddings_for_graph = self._embed_chunked(inputs, chunk_size=256)
+                t0 = time.time()
+                embeddings_for_graph = self._embed_chunked(inputs)
+                print(f"Embedding time: {time.time() - t0:.3f}s")
+
+                t1 = time.time()
                 fullGraph = self.graph_builder(
                     latens=embeddings_for_graph,
                     train_val_y=y,
@@ -66,6 +73,7 @@ class Trainer:
                     K_neigh=self.config.K_neigh,
                     device=self.device,
                 )
+                print(f"Graph build time: {time.time() - t1:.3f}s")
                 del embeddings_for_graph   # free before the training loop starts
                 torch.cuda.empty_cache()
 
@@ -78,6 +86,7 @@ class Trainer:
                 shuffle=True,
             )
 
+            t2 = time.time()
             for subgraph in loader:
                 batch_inputs = {
                     k: v[subgraph.n_id].to(self.device) 
@@ -90,6 +99,9 @@ class Trainer:
                 del batch_inputs
                 torch.cuda.empty_cache()
 
+            print(f"GNN training time: {time.time() - t2:.3f}s")
+
+            print(f"Total epoch time: {time.time() - start:.3f}s")
             return total_loss / len(loader)
         #FULL-BATCH TRAINING: embed all nodes, build one giant graph, and train on it repeatedly
         else:
@@ -145,10 +157,9 @@ class Trainer:
         outputs = self.gnn(
             self.graph_builder(embeddings, y, None, self.config.K_neigh, device=self.device)
         )
-        print(outputs.device, y.device)
         loss = self.criterion(outputs, y).item()
         preds = torch.argmax(outputs, dim=1)
-        
+        print(y.device, preds.device)
         if self.metric_fn is not None:
             metric_value = self.metric_fn(preds, y)
         else:

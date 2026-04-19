@@ -14,12 +14,6 @@ class FewShotTextDataset(BaseFewShotDataset):
             self.another_input_ids = x_another["input_ids"]
             self.another_attention_mask = x_another["attention_mask"]
             self.another_y = y_another
-            """
-            self.input_ids = torch.cat((self.other_input_ids, self.another_input_ids))
-            self.attention_mask = torch.cat((self.other_attention_mask, self.another_attention_mask))
-            self.y = torch.cat((self.other_y, self.another_y))
-            self.train_mask = self.create_train_mask(len(self.input_ids), len(self.y))
-            """ 
             self.update_train_mask()
         else:
             #Teszthalmaz
@@ -27,7 +21,6 @@ class FewShotTextDataset(BaseFewShotDataset):
             self.attention_mask = self.other_attention_mask
             self.y = self.other_y
             self.train_mask = None
-
 
     def update_train_mask(self, max_size_as_class=None):
         if max_size_as_class is None:

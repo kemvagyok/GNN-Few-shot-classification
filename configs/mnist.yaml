@@ -6,7 +6,7 @@ paths:
 dataset:
   dataset_type: "image"  # "image", "text"
   dataset_name: "MNIST"  # "ISIC2019", "ChestX", "MNIST"
-  train_images_per_class: [1, 2, 5, 10, 20, 50, 100]
+  train_images_per_class: [100]
   img_size : 28
   test_size: 0.2
   val_size: 0.2
@@ -22,11 +22,11 @@ graph:
   rebuild_graph_each_epoch: true
 
 training:
-  embedding: "resnet18" #cnn, resnet18
+  embedding: "resnet18" #cnn, resnet18, resnet50
   gnn_model: "gatv2conv" #gcnconv, gatv2conv
   lr_embedder: 0.01
   lr_gcn: 0.01
-  epochs_max: 2500
+  epochs_max: 200
   batch_size: 128
   criterion: "cross_entropy" # "cross_entropy", "focal_loss"
   metrics: "accuracy" # "accuracy", "macro_f1"

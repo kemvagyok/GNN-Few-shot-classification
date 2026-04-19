@@ -1,0 +1,44 @@
+import torch
+import torch.nn as nn
+from transformers import AutoModel
+from ..registry import register_embedding
+
+@register_embedding("qwen")
+class QwenEmbeddingModel(nn.Module):
+    def __init__(self, model_name="Qwen/Qwen3-Embedding-0.6B", freeze_model=False):
+        super().__init__()
+        
+        # A Qwen modellekhez a generikus AutoModel-t használjuk
+        self.model = AutoModel.from_pretrained(model_name)
+        
+        if freeze_model:
+            for param in self.model.parameters():
+                param.requires_grad = False
+
+        # A Qwen3-Embedding-0.6B alapértelmezett kimeneti dimenziója (hidden_size) 1024.
+        # Ezt vetítjük le 64 dimenzióra.
+        self.fc = nn.Linear(self.model.config.hidden_size, 64) 
+
+    def forward(self, input_ids, attention_mask):
+        # Mivel ez az alap AutoModel, nem adunk vissza LM head logitokat, csak a rejtett állapotokat.
+        outputs = self.model(input_ids=input_ids,
+                             attention_mask=attention_mask)
+        
+        # Az összes token rejtett állapota (batch_size, seq_len, hidden_size)
+        hidden_states = outputs.last_hidden_state 
+        
+        # Qwen-specifikus "Last Token Pooling"
+        # Megkeressük az utolsó érvényes (nem padding) tokent a maszk alapján minden elemnél a batch-ben.
+        sequence_lengths = attention_mask.sum(dim=1) - 1
+        batch_size = hidden_states.shape[0]
+        
+        # Kinyerjük az utolsó érvényes tokenek vektorait -> (batch_size, hidden_size)
+        pooled_output = hidden_states[
+            torch.arange(batch_size, device=hidden_states.device), 
+            sequence_lengths
+        ]
+        
+        # Vektor levetítése 64 dimenzióra
+        latent_vector = self.fc(pooled_output)
+        
+        return latent_vector

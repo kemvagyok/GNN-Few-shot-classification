@@ -1,8 +1,15 @@
 import torch
 
 def macro_f1(preds, targets, num_classes=None, eps=1e-8):
+    if preds.ndim > 1 and preds.size(1) > 1:
+            preds = torch.argmax(preds, dim=1)
+
     if num_classes is None:
-        num_classes = torch.max(targets).item() + 1
+    # Check BOTH targets and preds to define the matrix size
+        num_classes = max(torch.max(targets).item(), torch.max(preds).item()) + 1
+
+    preds = preds.view(-1)
+    targets = targets.view(-1)
 
     preds = preds.view(-1)
     targets = targets.view(-1)
