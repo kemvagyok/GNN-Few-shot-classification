@@ -3,7 +3,7 @@
 import torch
 from criterions import FocalLoss, effective_num_weights
 
-def build_loss(config, targets, num_classes, device):
+def build_loss(config, targets, num_classes, device, weights=None):
     if config.criterion == "focal_loss":
         weights = effective_num_weights(
             targets,
@@ -18,7 +18,9 @@ def build_loss(config, targets, num_classes, device):
         )
 
     elif config.criterion == "cross_entropy":
-        return torch.nn.CrossEntropyLoss()
+        return torch.nn.CrossEntropyLoss(
+            weight = weights.to(device) if weights is not None else None
+        )
 
     elif config.criterion == "weighted_ce":
         weights = effective_num_weights(

@@ -3,14 +3,14 @@ from preprocessing.loadingModule import load_dataset_cached
 from configs import Config
 import argparse
 
-config_filename = "agnews"
+config_filename = "isic2019"
 config = Config(f"./configs/{config_filename}.yaml")
 
 
 load_dataset_cached(
     dataset_name=config.dataset_name,
     data_pth=config.dataset_path,
-    img_size=28,
+    img_size=128,
     files_size=-1
 )
 

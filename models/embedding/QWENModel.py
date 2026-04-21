@@ -38,6 +38,8 @@ class QwenEmbeddingModel(nn.Module):
             sequence_lengths
         ]
         
+        pooled_output = pooled_output.to(self.fc.weight.dtype)
+        
         # Vektor levetítése 64 dimenzióra
         latent_vector = self.fc(pooled_output)
         

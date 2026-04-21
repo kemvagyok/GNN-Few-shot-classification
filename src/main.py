@@ -19,9 +19,7 @@ from models import initalizeModels
 from preprocessing.factory import build_dataset
 from preprocessing.loadingModule import load_dataset_cached
 
-from training.TrainerEmbeddingOnly import TrainerEmbeddingOnly
-from training.Trainer import Trainer
-from training.TrainerDDP import TrainerDDP
+from training import TrainerEmbeddingOnly,Trainer, TrainerDDP
 
 from utils import (
     setup_device,
@@ -31,6 +29,7 @@ from utils import (
     save_results,
     get_class_distribution,
     print_distribution,
+    sample_k_per_class,
     split_dataset,
     wandb_run
 )
@@ -53,6 +52,7 @@ def main():
 
     device, local_rank, is_ddp = setup_device()
     print(device, local_rank, is_ddp)
+    #--------------------------
     x, y, num_class, channel_size = \
         load_dataset_cached(
             dataset_name=config.dataset_name,
@@ -61,45 +61,48 @@ def main():
             files_size=config.files_size if hasattr(config, "files_size") else 4000,
             force_reload=False
         )
-    
-    print_distribution(get_class_distribution(targets = y, num_classes = num_class))
-    print(y.unique(), len(y))
-    print("After splitting:")
-    temp1, tempt2, x, y = split_dataset(x,y, test_size=0.1) # csak arra jó, hogy csökkentsük a dataset méretét arnáyosan osztályként, nem használjuk fel a temp változókat
-    print_distribution(get_class_distribution(targets = y, num_classes = num_class))
-    print(y.unique(), len(y))
-    train_x, train_y, test_x, test_y = split_dataset(x,y, test_size=0.2)
-    
-    train_size = len(train_y)
-    test_size = len(test_y)
-    val_size = 0
-    
-    train_dataset = build_dataset(
-        datasetType=config.dataset_type,
-        train_x=train_x,
-        train_y=train_y,
-        val_x=test_x,
-        val_y=test_y,
-        num_class=num_class,
-        device=device
-    )
+    print_distribution(get_class_distribution(y, num_class))
 
-    test_dataset = build_dataset(
+    train_x, train_y, test_x, test_y = split_dataset(x,y, test_size=0.2)
+    train_x, train_y, val_x, val_y = split_dataset(train_x,train_y, test_size=0.1)
+
+    train_size = len(train_y)
+    val_size = len(val_y)
+    test_size = len(test_y)
+    print(train_size, val_size, test_size)
+    all_size = train_size + val_size + test_size
+    print(train_size / all_size, val_size / all_size, test_size / all_size)
+    #--------------------------
+    val_dataset = build_dataset(
             datasetType=config.dataset_type,
-            train_x=test_x,
-            train_y=test_y,
+            x=val_x,
+            y=val_y,
             num_class=num_class,
             device=device
-        )
+    )
     
-
+    test_dataset = build_dataset(
+            datasetType=config.dataset_type,
+            x=test_x,
+            y=test_y,
+            num_class=num_class,
+            device=device
+    )
+    #--------------------------
+    """
+    class_counts = y.bincount() 
+    print(class_counts)
+    weights = 1.0 / class_counts.float()
+    weights = weights / weights.sum()
+    """
     criterion = build_loss(
         config=config,
         targets=train_y,
         num_classes=num_class,
-        device=device
+        device=device,
+        #weights=weights
     )
-
+    #--------------------------
     metrics = build_metrics(config)
 
     mode = "fullbatch" if not config.use_minibatch else "minibatch"
@@ -108,53 +111,37 @@ def main():
 
     for max_label in config.train_images_per_class:
         K_hops = [None] if not config.use_minibatch else K_hop_list
-        for K_hop in K_hops:
-            train_dataset.update_train_mask(max_label)
+        if max_label == -1:
+            max_label = len(train_y)
+            filtered_train_x, filtered_train_y = train_x, train_y
+        else:
+            filtered_train_x, filtered_train_y = sample_k_per_class(train_x, train_y, num_class, max_label)
 
+        train_dataset = build_dataset(
+            datasetType=config.dataset_type,
+            x=filtered_train_x,
+            y=filtered_train_y,
+            num_class=num_class,
+            device=device)
+
+        for K_hop in K_hops:
             with wandb_run(config, is_ddp, run_id, K_hop, max_label, mode, train_size, val_size, test_size):
                 run_accs = []
                 set_seed(42 + run_id)
                 embedder, gnn = initalizeModels(
                     config = config, 
                     channel_size = channel_size, 
-                    num_class = num_class, 
+                    num_class = num_class,
+                    latens_size= num_class,
                     device = device, 
                     is_ddp = is_ddp)
                 
-                if is_ddp:
-                    trainer = TrainerDDP(
-                    embedder=embedder, 
-                    graph_builder=graph_builder, 
-                    gnn=gnn, 
-                    criterion=criterion, 
-                    metric_fn=metrics,
-                    config=config, 
-                    device=device,
-                    rank=local_rank,
-                    world_size=dist.get_world_size()
-                    )
-
-                else:
-                    """
-                    trainer = Trainer(
-                        embedder=embedder, 
-                        graph_builder=graph_builder, 
-                        gnn=gnn, criterion=criterion, 
-                        metric_fn=metrics,
-                        config=config, 
-                        device=device
-                        )
-                    """
-                    trainer = TrainerEmbeddingOnly(
-                        embedder=embedder, 
-                        criterion=criterion, 
-                        metric_fn=metrics,
-                        config=config, 
-                        device=device
-                        )
+                trainer = get_trainer(is_ddp, embedder, graph_builder, gnn, criterion, metrics, config, device, local_rank)
+                    
                 acc = trainer.train(
                     train_dataset=train_dataset, 
-                    val_dataset=(test_dataset if test_dataset is not None else None), 
+                    val_dataset=(val_dataset if val_dataset is not None else None), 
+                    test_dataset=(test_dataset if test_dataset is not None else None),
                     #K_hop = K_hop
                     )
                 
@@ -169,5 +156,37 @@ def main():
     if is_ddp:
         dist.destroy_process_group()
 
+def get_trainer(is_ddp, embedder, graph_builder, gnn, criterion, metrics, config, device, local_rank):
+    if is_ddp:
+            return TrainerDDP(
+            embedder=embedder, 
+            graph_builder=graph_builder, 
+            gnn=gnn, 
+            criterion=criterion, 
+            metric_fn=metrics,
+            config=config, 
+            device=device,
+            rank=local_rank,
+            world_size=dist.get_world_size()
+            )
+
+    if config.train_mode == "embedding_only":
+        return TrainerEmbeddingOnly(
+            embedder=embedder, 
+            criterion=criterion, 
+            metric_fn=metrics,
+            config=config, 
+            device=device
+            )
+    return Trainer(
+        embedder=embedder, 
+        graph_builder=graph_builder, 
+        gnn=gnn, criterion=criterion, 
+        metric_fn=metrics,
+        config=config, 
+        device=device
+        )
+
 if __name__ == "__main__":
     main()
+

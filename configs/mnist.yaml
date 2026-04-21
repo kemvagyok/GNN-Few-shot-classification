@@ -6,13 +6,13 @@ paths:
 dataset:
   dataset_type: "image"  # "image", "text"
   dataset_name: "MNIST"  # "ISIC2019", "ChestX", "MNIST"
-  train_images_per_class: [100]
+  train_images_per_class: [1, 2, 5, 10, 20, 50, 100, -1] # -1 means using all available images for training
   img_size : 28
   test_size: 0.2
   val_size: 0.2
   train_file_size: -1
   test_file_size: -1
-  use_minibatch: true
+  use_minibatch: false
   without_valid: false
 
 graph:
@@ -22,7 +22,8 @@ graph:
   rebuild_graph_each_epoch: true
 
 training:
-  embedding: "resnet18" #cnn, resnet18, resnet50
+  train_mode: "embedding_only" # "full", "embedding_only"
+  embedding: "cnn" #cnn, resnet18, resnet50
   gnn_model: "gatv2conv" #gcnconv, gatv2conv
   lr_embedder: 0.01
   lr_gcn: 0.01
@@ -30,12 +31,15 @@ training:
   batch_size: 128
   criterion: "cross_entropy" # "cross_entropy", "focal_loss"
   metrics: "accuracy" # "accuracy", "macro_f1"
+  patience: 10
+  delta: 0.001
 similarity:
   # method_similar: "p_norm"
   # p_n_vectors: [1, 2, 3]
 
 model:
   latens_size: 64
-
+  model_embedder_save_path: "./models/checkpoints/"
+  
 reproducibility:
   seed: 42

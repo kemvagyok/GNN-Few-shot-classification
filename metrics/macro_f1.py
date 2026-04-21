@@ -1,18 +1,14 @@
 import torch
 
-def macro_f1(preds, targets, num_classes=None, eps=1e-8):
-    if preds.ndim > 1 and preds.size(1) > 1:
-            preds = torch.argmax(preds, dim=1)
+def macro_f1(preds, targets, num_classes=8, eps=1e-8):
+    if preds.ndim > 1:
+        preds = torch.argmax(preds, dim=1)
+
+    preds = preds.view(-1)
+    targets = targets.view(-1)
 
     if num_classes is None:
-    # Check BOTH targets and preds to define the matrix size
-        num_classes = max(torch.max(targets).item(), torch.max(preds).item()) + 1
-
-    preds = preds.view(-1)
-    targets = targets.view(-1)
-
-    preds = preds.view(-1)
-    targets = targets.view(-1)
+        num_classes = max(preds.max(), targets.max()) + 1
 
     conf_mat = torch.zeros((num_classes, num_classes), device=preds.device)
 
@@ -30,5 +26,9 @@ def macro_f1(preds, targets, num_classes=None, eps=1e-8):
     recall = tp / (tp + fn + eps)
 
     f1 = 2 * precision * recall / (precision + recall + eps)
+
+    # 🔥 csak a valid osztályok
+    valid = (tp + fn) > 0
+    f1 = f1[valid]
 
     return f1.mean().item()
