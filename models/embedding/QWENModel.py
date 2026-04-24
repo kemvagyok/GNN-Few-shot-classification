@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from transformers import AutoModel
 from ..registry import register_embedding
+import torch.nn.functional as F
 
 @register_embedding("qwen")
 class QwenEmbeddingModel(nn.Module):
@@ -42,5 +43,5 @@ class QwenEmbeddingModel(nn.Module):
         
         # Vektor levetítése 64 dimenzióra
         latent_vector = self.fc(pooled_output)
-        
+        latent_vector = F.normalize(latent_vector, p=2, dim=1)
         return latent_vector

@@ -6,7 +6,7 @@ paths:
 dataset:
   dataset_type: "text"  # "image", "text"
   dataset_name: "DBpedia"  # "AGNews", "DBpedia",
-  train_images_per_class: [1, 2, 5, 10, 20, 50, 100]
+  train_images_per_class: [1, 2, 5, 10, 20, 50, 100, -1]
   img_size : 0
   test_size: 0.2
   use_minibatch: true
@@ -14,13 +14,13 @@ dataset:
 
 graph:
   K_neigh: 3
-  K_hop_list: [1, 2, 3, 4, 5, 6]
+  K_hop_list: [1, 2, 3, 4, 5]
   graph_refresh: 10
   rebuild_graph_each_epoch: true
 
 training:
   train_mode: "embedding_only" # "full", "embedding_only"
-  embedding: "bert" #bert
+  embedding: "bert" #bert, qwen
   gnn_model: "gatv2conv" # gcnconv, gatv2conv
   lr_embedder: 0.0003
   lr_gcn: 0.0003

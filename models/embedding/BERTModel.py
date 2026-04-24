@@ -3,6 +3,7 @@ import torch.nn as nn
 from torchvision import models
 from transformers import BertTokenizer, BertModel
 from ..registry import register_embedding
+import torch.nn.functional as F
 
 @register_embedding("bert")
 class BERTModel(nn.Module):
@@ -23,6 +24,7 @@ class BERTModel(nn.Module):
         
         # Vektor levetítése 64 dimenzióra
         latent_vector = self.fc(pooled_output)
+        latent_vector = F.normalize(latent_vector, p=2, dim=1)
         
         return latent_vector
 

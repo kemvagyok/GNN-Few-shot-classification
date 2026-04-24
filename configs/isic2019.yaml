@@ -6,17 +6,17 @@ paths:
 dataset:
   dataset_type: "image"  # "image", "text"
   dataset_name: "ISIC2019"  # "ISIC2019", "ChestX", "MNIST"
-  train_images_per_class: [1, 2, 5, 10, 20, 50, 100]
-  img_size : 28
+  train_images_per_class: [1, 2, 5, 10, 20, 50, 100, -1]
+  img_size : 224
   test_size: 0.2
   val_size: 0.2
   files_size: 8000
-  use_minibatch: false
+  use_minibatch: true
   without_valid: false
 
 graph:
   K_neigh: 3
-  K_hop_list: [1, 2, 3, 4, 5, 6]
+  K_hop_list: [1, 2, 3, 4, 5]
   graph_refresh: 10
   rebuild_graph_each_epoch: true
 
@@ -32,7 +32,8 @@ training:
   metrics: "macro_f1" # "accuracy", "macro_f1"
   patience: 100
   delta: 0.001
-
+  use_class_weights: true
+  
 similarity:
   # method_similar: "p_norm"
   # p_n_vectors: [1, 2, 3]

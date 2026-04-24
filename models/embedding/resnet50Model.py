@@ -38,4 +38,3 @@ class Resnet50Model(nn.Module):
         x = self.fc(x)
         x = F.normalize(x, p=2, dim=1)
         return x
-    

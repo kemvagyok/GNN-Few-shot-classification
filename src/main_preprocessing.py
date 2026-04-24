@@ -10,7 +10,7 @@ config = Config(f"./configs/{config_filename}.yaml")
 load_dataset_cached(
     dataset_name=config.dataset_name,
     data_pth=config.dataset_path,
-    img_size=128,
+    img_size=224,
     files_size=-1
 )
 

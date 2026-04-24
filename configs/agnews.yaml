@@ -30,7 +30,7 @@ training:
   metrics: "accuracy" # "accuracy", "macro_f1"
   patience: 100
   delta: 0.001
-
+  use_class_weights: false
 similarity:
   # method_similar: "p_norm"
   # p_n_vectors: [1, 2, 3]

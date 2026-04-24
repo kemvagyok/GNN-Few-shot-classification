@@ -19,7 +19,7 @@ from models import initalizeModels
 from preprocessing.factory import build_dataset
 from preprocessing.loadingModule import load_dataset_cached
 
-from training import TrainerEmbeddingOnly,Trainer, TrainerDDP
+from training import TrainerEmbeddingOnly, TrainerEmbeddingOnlyDDP, Trainer, TrainerDDP
 
 from utils import (
     setup_device,
@@ -62,7 +62,8 @@ def main():
             force_reload=False
         )
     print_distribution(get_class_distribution(y, num_class))
-
+    if config.dataset_name == "ISIC2019":
+        num_class -=1
     train_x, train_y, test_x, test_y = split_dataset(x,y, test_size=0.2)
     train_x, train_y, val_x, val_y = split_dataset(train_x,train_y, test_size=0.1)
 
@@ -89,28 +90,33 @@ def main():
             device=device
     )
     #--------------------------
-    """
-    class_counts = y.bincount() 
-    print(class_counts)
-    weights = 1.0 / class_counts.float()
-    weights = weights / weights.sum()
-    """
+    if config.use_class_weights:
+        class_counts = y.bincount() 
+        print(class_counts)
+        weights = 1.0 / class_counts.float()
+        weights = weights / weights.sum()
+    else:
+        weights = None
+
     criterion = build_loss(
         config=config,
         targets=train_y,
         num_classes=num_class,
         device=device,
-        #weights=weights
+        weights=weights
     )
     #--------------------------
     metrics = build_metrics(config)
 
     mode = "fullbatch" if not config.use_minibatch else "minibatch"
 
+
     best_results = []
 
     for max_label in config.train_images_per_class:
         K_hops = [None] if not config.use_minibatch else K_hop_list
+        K_hops = [None] if config.train_mode == "embedding_only" else K_hop_list
+
         if max_label == -1:
             max_label = len(train_y)
             filtered_train_x, filtered_train_y = train_x, train_y
@@ -142,7 +148,7 @@ def main():
                     train_dataset=train_dataset, 
                     val_dataset=(val_dataset if val_dataset is not None else None), 
                     test_dataset=(test_dataset if test_dataset is not None else None),
-                    #K_hop = K_hop
+                    K_hop = K_hop
                     )
                 
                 run_accs.append(acc)
@@ -158,17 +164,27 @@ def main():
 
 def get_trainer(is_ddp, embedder, graph_builder, gnn, criterion, metrics, config, device, local_rank):
     if is_ddp:
-            return TrainerDDP(
-            embedder=embedder, 
-            graph_builder=graph_builder, 
-            gnn=gnn, 
-            criterion=criterion, 
-            metric_fn=metrics,
-            config=config, 
-            device=device,
-            rank=local_rank,
-            world_size=dist.get_world_size()
-            )
+            if config.train_mode == "embedding_only":
+                return TrainerEmbeddingOnlyDDP(
+                    embedder=embedder, 
+                    criterion=criterion, 
+                    metric_fn=metrics,
+                    config=config, 
+                    rank=local_rank,
+                    world_size=dist.get_world_size()
+                )
+            else:
+                return TrainerDDP(
+                embedder=embedder, 
+                graph_builder=graph_builder, 
+                gnn=gnn, 
+                criterion=criterion, 
+                metric_fn=metrics,
+                config=config, 
+                device=device,
+                rank=local_rank,
+                world_size=dist.get_world_size()
+                )
 
     if config.train_mode == "embedding_only":
         return TrainerEmbeddingOnly(

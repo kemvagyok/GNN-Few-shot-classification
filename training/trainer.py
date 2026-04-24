@@ -19,7 +19,7 @@ class Trainer:
             self.gnn.parameters(), lr=config.lr_gcn
         )
 
-    def train(self, train_dataset, val_dataset=None, K_hop=None):
+    def train(self, train_dataset, val_dataset=None, test_dataset=None, K_hop=None, **kwargs):
         best_val_acc = 0
         for epoch in range(self.config.epochs_max):
             train_loss = self._train_epoch(
@@ -46,6 +46,16 @@ class Trainer:
                     best_val_acc = val_acc
             else:
                 print(f"[Epoch {epoch}] Train Loss: {train_loss:.4f}")
+
+        if test_dataset is not None:
+            test_loss, test_metric = self.evaluate(test_dataset)
+
+            print(f"Test Loss: {test_loss:.4f} | Test Metric: {test_metric:.4f}")
+            wandb.log({
+                "test_loss": test_loss,
+                "test_metric": test_metric
+            })   
+
         return best_val_acc
 
     def _train_epoch(self, labeled_dataset, unlabeled_dataset, K_hop):
@@ -76,7 +86,6 @@ class Trainer:
             train_mask = torch.zeros(fullGraph.num_nodes, dtype=torch.bool)
             train_mask[train_idx] = True
             fullGraph.train_mask = train_mask
-
             loader = NeighborLoader(
                 fullGraph,
                 num_neighbors=[self.config.K_neigh] * K_hop,
@@ -109,7 +118,12 @@ class Trainer:
                 K_neigh=self.config.K_neigh,
                 device=self.device,
             )
+
+            train_mask = torch.zeros(fullGraph.num_nodes, dtype=torch.bool)
+            train_mask[train_idx] = True
+            fullGraph.train_mask = train_mask
             loss = self._step(fullGraph)
+
             total_loss += loss.item()
             return total_loss
 
@@ -160,7 +174,7 @@ class Trainer:
         )
 
         outputs = self.gnn(graph)
-        loss = self.criterion(outputs, y).item()
+        loss = self.criterion(outputs, y)
         preds = torch.argmax(outputs, dim=1)
         if self.metric_fn is not None:
             metric_value = self.metric_fn(preds, y)
@@ -176,7 +190,7 @@ class Trainer:
         unlabeled_inputs = unlabeled_data["inputs"]
 
         merged_inputs = {
-            k: torch.cat([labeled_inputs[k], unlabeled_inputs[k]], dim=0)
+            k: torch.cat([labeled_inputs[k].to(self.device), unlabeled_inputs[k].to(self.device)], dim=0)
             for k in labeled_inputs
         }
 
@@ -189,5 +203,5 @@ class Trainer:
 
         train_idx = torch.arange(train_size)
         val_idx = torch.arange(train_size, merged_y.size(0))
-        print(val_idx)
+
         return merged_inputs, merged_y, train_idx, val_idx
