@@ -14,3 +14,6 @@ class IndexedDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, i):
         return self.base[int(self.indices[i])]
+    
+    def get_all(self):
+        return self.base.get_all(self.indices)

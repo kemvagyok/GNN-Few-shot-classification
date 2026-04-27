@@ -16,9 +16,7 @@ class ImageDatasetInMemory(Dataset):
         return len(self.images)
 
     def __getitem__(self, idx):
-        image = self.images[idx]
-
-        x = image
+        x = self.images[idx]
         y = self.labels[idx]
 
         return {
@@ -27,4 +25,10 @@ class ImageDatasetInMemory(Dataset):
             },
             "labels": y
         }
-    
+    def get_all(self, indices):
+                return {
+            "inputs": {
+                "x": self.images[indices]
+            },
+            "labels": self.labels[indices]
+        }

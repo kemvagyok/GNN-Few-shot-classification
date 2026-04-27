@@ -7,7 +7,7 @@ from utils import EarlyStopping
 import wandb
 
 
-class TrainerEmbeddingOnlyDDP:
+class TrainerEmbeddingOnlyMinibatch_DDP:
     def __init__(self, embedder, criterion, config, rank, world_size, metric_fn=None):
         self.rank = rank
         self.world_size = world_size

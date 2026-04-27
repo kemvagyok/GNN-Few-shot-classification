@@ -9,7 +9,7 @@ from torch_geometric.loader import NeighborLoader
 import wandb
 
 
-class TrainerInMemory_DDP:
+class TrainerEmbeddingGNNMinibatch_DDP:
     def __init__(self, embedder, gnn, criterion, config, local_rank, metric_fn=None):
         self.local_rank = local_rank
         self.device = torch.device(f"cuda:{local_rank}")

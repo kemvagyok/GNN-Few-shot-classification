@@ -5,7 +5,7 @@ from torch_geometric.data import Data
 from torch_geometric.loader import NeighborLoader
 import wandb
 
-class TrainerInMemory:
+class TrainerEmbeddingGNNMinibatch:
     def __init__(self, embedder, gnn, criterion, config, device, metric_fn=None):
         self.embedder = embedder.to(device)
         self.gnn = gnn.to(device)

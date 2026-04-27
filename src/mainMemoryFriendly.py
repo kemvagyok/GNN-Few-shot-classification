@@ -7,8 +7,16 @@ from configs import Config
 from utils import setup_device
 from utils.loss_factory import build_loss
 from utils.dataset_utils import build_indices
-from training.trainerInMemory import TrainerInMemory
-from training.trainerInMemory_DDP import TrainerInMemory_DDP
+#----------------------------------------------------
+from training.trainer import Trainer
+from training.trainerDDP import TrainerDDP
+
+from training.trainerEmbeddingGNNMinibatch import TrainerEmbeddingGNNMinibatch
+from training.trainerEmbeddingGNNMinibatch_DDP import TrainerEmbeddingGNNMinibatch_DDP
+
+from training.trainerEmbeddingOnlyMinibatch import TrainerEmbeddingOnlyMinibatch
+from training.trainerEmbeddingOnlyMinibatch_DDP import TrainerEmbeddingOnlyMinibatch_DDP
+#----------------------------------------------------
 from preprocessing.indexedDataset import IndexedDataset
 import numpy as np
 import time
@@ -30,25 +38,28 @@ from utils import (
 )
 
 def get_trainer(is_ddp, embedder, gnn, criterion, metrics, config, device, local_rank):
-    if config.train_mode == "embedding_only":
         
     if not is_ddp:
-        return TrainerInMemory(
+        return Trainer(
         embedder=embedder,
         gnn=gnn,
+        graph_builder=graph_builder,
         criterion=criterion,
         config=config,
         device=device,
         metric_fn=metrics
     )
     else:
-        return TrainerInMemory_DDP(
+        return TrainerDDP(
             embedder=embedder,
             gnn=gnn,
+            graph_builder=graph_builder,
             criterion=criterion,
             config=config,
             local_rank=local_rank,
-            metric_fn=metrics
+            metric_fn=metrics,
+            world_size=dist.get_world_size(),
+            device=device
         )
 
 
@@ -80,8 +91,8 @@ def measure_training_time(trainer, train_data, val_data, test_data, is_ddp, loca
     if not is_ddp or (is_ddp and local_rank == 0):
         mode_str = "DDP" if is_ddp else "Single GPU / CPU"
         print(f"\n{'='*40}")
-        print(f"⏱️ [{mode_str}] Futási idő: {elapsed_time:.2f} másodperc ({elapsed_time/60:.2f} perc)")
-        print(f"🏆 Legjobb validációs metrika: {best_val:.4f}")
+        print(f"[{mode_str}] Futási idő: {elapsed_time:.2f} másodperc ({elapsed_time/60:.2f} perc)")
+        print(f"Legjobb validációs metrika: {best_val:.4f}")
         print(f"{'='*40}\n")
 
     return best_val, elapsed_time
@@ -127,15 +138,19 @@ train_dataset, val_dataset, test_dataset, meta = get_datasetInMemory(
             val_size=val_size,
             test_size=test_size,
         )
-# ---------------- SPLITTING ----------------
 
+print(set(train_dataset.indices) & set(val_dataset.indices))
+
+# ---------------- SPLITTING ----------------
 # labels a full datasetből
 labels = meta["labels"]
 
 # ---------------- DEVICE ----------------
+
 device, local_rank, is_ddp = setup_device()
 
 # ---------------- LOSS ----------------
+
 criterion = build_loss(
     config=config,
     targets=meta["labels"],
@@ -150,15 +165,14 @@ metrics = build_metrics(config)
 
 # ---------------- TRAINER ----------------
 best_results = []
-
-
+train_dataset_original_indices = train_dataset.indices
 for max_label in config.train_images_per_class:
         K_hops = [None] if not config.use_minibatch else K_hop_list
         K_hops = [None] if config.train_mode == "embedding_only" else K_hop_list
         if max_label == -1:
-             train_idx = build_indices(labels[train_dataset.indices], max_per_class=len(train_dataset.indices))
+             train_idx = build_indices(labels[train_dataset_original_indices], max_per_class=len(train_dataset.indices))
         train_idx = build_indices(labels[train_dataset.indices], max_per_class=max_label)
-        train_dataset = IndexedDataset(train_dataset, train_idx)
+        train_dataset = IndexedDataset(train_dataset.base, train_idx)
         for K_hop in K_hops:
             with wandb_run(config, is_ddp, run_id, K_hop, max_label, None, train_size, val_size, test_size):
                 # ---------------- MODELS ----------------

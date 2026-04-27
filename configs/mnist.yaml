@@ -30,7 +30,7 @@ training:
   epochs_max: 1500
   batch_size: 128
   criterion: "cross_entropy" # "cross_entropy", "focal_loss"
-  metrics: "macro_f1" # "accuracy", "macro_f1"
+  metrics: "accuracy" # "accuracy", "macro_f1"
   patience: 10
   delta: 0.001
   use_class_weights: false

@@ -2,7 +2,7 @@ import torch
 from torch.utils.data import DataLoader
 import wandb
 
-class TrainerEmbeddingOnly:
+class TrainerEmbeddingOnlyMinibatch:
     def __init__(self, embedder, criterion, config, device, metric_fn=None):
         self.embedder = embedder.to(device)
         self.device = device

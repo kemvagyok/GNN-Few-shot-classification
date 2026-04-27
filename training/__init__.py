@@ -1,4 +1,4 @@
 from .trainer import Trainer
-from .trainerEmbeddingOnly import TrainerEmbeddingOnly
+from .trainerEmbeddingOnlyMinibatch import TrainerEmbeddingOnly
 from .trainerDDP import TrainerDDP
-from .trainerEmbeddingOnlyDDP import TrainerEmbeddingOnlyDDP
+from .trainerEmbeddingOnlyMinibatch_DDP import TrainerEmbeddingOnlyDDP

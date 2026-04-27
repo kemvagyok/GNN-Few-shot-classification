@@ -7,8 +7,8 @@ from torch_geometric.loader import NeighborLoader
 
 
 class TrainerDDP:
-    def __init__(self, embedder, graph_builder, gnn, criterion,
-                 config, device, rank=0, world_size=1, metric_fn=None):
+    def __init__(self, embedder, gnn, graph_builder,  criterion,
+                 config, device, local_rank=0, world_size=1, metric_fn=None):
 
         self.embedder = embedder.to(device)
         self.graph_builder = graph_builder
@@ -16,7 +16,7 @@ class TrainerDDP:
 
         self.config = config
         self.device = device
-        self.rank = rank
+        self.rank = local_rank
         self.world_size = world_size
 
         self.criterion = criterion.to(device)
@@ -65,14 +65,14 @@ class TrainerDDP:
 
         return best_val_acc
 
-    def _train_epoch(self, dataset, K_hop):
+    def _train_epoch(self, labeled_dataset, unlabeled_dataset, K_hop):
         self.embedder.train()
         self.gnn.train()
 
-        data = dataset.get_all()
-        inputs = data["inputs"]
-        y = data["labels"]
-        train_mask = data["train_mask"]
+        data_labeled = labeled_dataset.get_all()
+        data_unlabeled   = unlabeled_dataset.get_all()
+        inputs, y, train_idx, val_idx = self._merge_datasets(data_labeled, data_unlabeled)
+
         start = time.time()
         total_loss = 0
             # ---- graph build ----
@@ -83,7 +83,6 @@ class TrainerDDP:
             fullGraph = self.graph_builder(
                 latens=embeddings_for_graph,
                 train_val_y=y,
-                train_mask=train_mask,
                 K_neigh=self.config.K_neigh,
                 device=self.device,
             )
@@ -91,8 +90,9 @@ class TrainerDDP:
             del embeddings_for_graph
             torch.cuda.empty_cache()
 
-        train_idx = fullGraph.train_mask.nonzero(as_tuple=False).view(-1)
-        train_idx = train_idx.chunk(self.world_size)[self.rank]
+        train_mask = torch.zeros(fullGraph.num_nodes, dtype=torch.bool)
+        train_mask[train_idx] = True
+        fullGraph.train_mask = train_mask
 
         loader = NeighborLoader(
             fullGraph,
@@ -188,3 +188,24 @@ class TrainerDDP:
             del chunk
 
         return torch.cat(chunks, dim=0)
+    
+    def _merge_datasets(self, labeled_data, unlabeled_data):
+        labeled_inputs = labeled_data["inputs"]
+        unlabeled_inputs = unlabeled_data["inputs"]
+
+        merged_inputs = {
+            k: torch.cat([labeled_inputs[k].to(self.device), unlabeled_inputs[k].to(self.device)], dim=0)
+            for k in labeled_inputs
+        }
+
+        labeled_y = labeled_data["labels"]
+        unlabeled_y = unlabeled_data["labels"]
+
+        merged_y = torch.cat([labeled_y, unlabeled_y], dim=0)
+
+        train_size = labeled_y.size(0)
+
+        train_idx = torch.arange(train_size)
+        val_idx = torch.arange(train_size, merged_y.size(0))
+
+        return merged_inputs, merged_y, train_idx, val_idx
