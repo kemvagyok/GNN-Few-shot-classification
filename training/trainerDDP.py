@@ -28,9 +28,6 @@ class TrainerDDP:
             self.gnn.parameters(), lr=config.lr_gcn
         )
 
-    # ---------------------------
-    # 🔧 DDP utils
-    # ---------------------------
     def _is_main(self):
         return self.rank == 0
 
@@ -39,9 +36,6 @@ class TrainerDDP:
         tensor /= self.world_size
         return tensor
 
-    # ---------------------------
-    # 🚀 TRAIN
-    # ---------------------------
     def train(self, train_dataset, val_dataset=None, K_hop=None):
         best_val_acc = 0
 
@@ -49,7 +43,6 @@ class TrainerDDP:
             train_loss = self._train_epoch(train_dataset, K_hop)
 
             if val_dataset is not None:
-                # ❗ FIX: csak egyszer evaluate
                 val_loss, val_metric = self.evaluate(val_dataset)
 
                 if self._is_main():
@@ -72,9 +65,6 @@ class TrainerDDP:
 
         return best_val_acc
 
-    # ---------------------------
-    # 🔥 TRAIN EPOCH
-    # ---------------------------
     def _train_epoch(self, dataset, K_hop):
         self.embedder.train()
         self.gnn.train()
@@ -87,11 +77,7 @@ class TrainerDDP:
         total_loss = 0
             # ---- graph build ----
         with torch.no_grad():
-            t0 = time.time()
             embeddings_for_graph = self._embed_chunked(inputs, chunk_size=256)
-
-            if self._is_main():
-                print(f"Embedding time: {time.time() - t0:.2f}s")
 
             t1 = time.time()
             fullGraph = self.graph_builder(
@@ -101,12 +87,10 @@ class TrainerDDP:
                 K_neigh=self.config.K_neigh,
                 device=self.device,
             )
-            if self._is_main():
-                print(f"Graph build time: {time.time() - t1:.2f}s")
+
             del embeddings_for_graph
             torch.cuda.empty_cache()
 
-        # 🔑 DDP shard
         train_idx = fullGraph.train_mask.nonzero(as_tuple=False).view(-1)
         train_idx = train_idx.chunk(self.world_size)[self.rank]
 
@@ -117,7 +101,6 @@ class TrainerDDP:
             batch_size=self.config.batch_size,
             shuffle=True,
         )
-        t2 = time.time()
         for subgraph in loader:
             batch_inputs = {
                 k: v[subgraph.n_id].to(self.device)
@@ -126,10 +109,6 @@ class TrainerDDP:
 
             loss = self._step(subgraph, raw_inputs=batch_inputs)
             total_loss += loss.item()
-
-            if self._is_main():
-                print(f"GNN training time: {time.time() - t2:.3f}s")
-                print(f"Total epoch time: {time.time() - start:.3f}s")
                 
             del batch_inputs
             torch.cuda.empty_cache()
@@ -139,9 +118,6 @@ class TrainerDDP:
 
         return loss.item()
 
-    # ---------------------------
-    # ⚡ STEP
-    # ---------------------------
     def _step(self, graph, raw_inputs=None):
         self.opt_embedder.zero_grad()
         self.opt_gnn.zero_grad()
@@ -163,10 +139,7 @@ class TrainerDDP:
         self.opt_gnn.step()
 
         return loss
-
-    # ---------------------------
-    # 📉 EVAL
-    # ---------------------------
+    
     @torch.no_grad()
     def evaluate(self, dataset):
         self.embedder.eval()
@@ -201,9 +174,6 @@ class TrainerDDP:
 
         return loss.item(), metric_value.item()
 
-    # ---------------------------
-    # 🧠 EMBEDDING
-    # ---------------------------
     @torch.no_grad()
     def _embed_chunked(self, raw_inputs, chunk_size=256):
         chunks = []

@@ -18,7 +18,7 @@ dataset:
 graph:
   K_neigh: 3
   K_hop_list: [1, 2, 3, 4, 5]
-  graph_refresh: 10
+  graph_refresh: 1
   rebuild_graph_each_epoch: true
 
 training:
@@ -27,10 +27,10 @@ training:
   gnn_model: "gatv2conv" #gcnconv, gatv2conv
   lr_embedder: 0.01
   lr_gcn: 0.01
-  epochs_max: 2500
+  epochs_max: 1500
   batch_size: 128
   criterion: "cross_entropy" # "cross_entropy", "focal_loss"
-  metrics: "accuracy" # "accuracy", "macro_f1"
+  metrics: "macro_f1" # "accuracy", "macro_f1"
   patience: 10
   delta: 0.001
   use_class_weights: false

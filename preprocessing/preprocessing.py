@@ -101,7 +101,7 @@ class ChestXDataset(ImagesDataModule):
 
         return x, y, len(classes), (1 if self.grayscale else 3)
 
-class MNISTDataset(ImagesDataModule):
+class MNISTDatasetA(ImagesDataModule):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -207,7 +207,7 @@ def get_dataset_class(name):
     elif name == "ChestX":
         return ChestXDataset
     elif name == "MNIST":
-        return MNISTDataset
+        return MNISTDatasetA
     elif name == "AGNews":
         return AGNewsDataset
     elif name == "DBpedia":

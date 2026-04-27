@@ -17,11 +17,11 @@ dataset:
 graph:
   K_neigh: 3
   K_hop_list: [1, 2, 3, 4, 5]
-  graph_refresh: 10
+  graph_refresh: 1
   rebuild_graph_each_epoch: true
 
 training:
-  train_mode: "embedding_only" # "full", "embedding_only"
+  train_mode: "full" # "full", "embedding_only"
   embedding: "resnet50" #cnn, resnet18, resnet50
   gnn_model: "gatv2conv" # gcnconv, gatv2conv
   lr_embedder: 0.0003

@@ -47,15 +47,3 @@ class ImagesDataModule:
             imgs.append(self.transform(img))
 
         return torch.stack(imgs), torch.tensor(labels)
-
-    @staticmethod
-    def split_data(self, paths, labels, test_size=0.2, val_size=0.2):
-        train_p, test_p, train_y, test_y = train_test_split(
-            paths, labels, stratify=labels, test_size=test_size, random_state=42
-        )
-
-        train_p, val_p, train_y, val_y = train_test_split(
-            train_p, train_y, test_size=val_size, random_state=42
-        )
-
-        return train_p, val_p, test_p, train_y, val_y, test_y

@@ -52,19 +52,3 @@ def load_dataset_cached(
     }, cache_path)
 
     return data
-
-
-# =========================================================
-# SPECIFIC WRAPPERS (optional)
-# =========================================================
-def dataLoading_ISIC2019(**kwargs):
-    return load_dataset_cached("ISIC2019", **kwargs)
-
-def dataLoading_ChestX(**kwargs):
-    return load_dataset_cached("ChestX", **kwargs)
-
-def dataLoading_MNIST(**kwargs):
-    return load_dataset_cached("MNIST", **kwargs)
-
-def dataLoading_AGNews(**kwargs):
-    return load_dataset_cached("AGNews", **kwargs)

@@ -177,7 +177,7 @@ class Trainer:
         loss = self.criterion(outputs, y)
         preds = torch.argmax(outputs, dim=1)
         if self.metric_fn is not None:
-            metric_value = self.metric_fn(preds, y)
+            metric_value = self.metric_fn(preds, y, num_classes = dataset.num_class)
         else:
             metric_value = (preds == y).sum().item() / y.size(0)
 

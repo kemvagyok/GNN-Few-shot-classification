@@ -86,3 +86,23 @@ def sample_k_per_class(x, y, num_class, k):
     y_k = y[idx]
 
     return (x_k, y_k)
+
+
+def build_indices(labels, max_per_class=None, seed=42):
+    labels = np.array(labels)
+    indices = np.arange(len(labels))
+
+    rng = np.random.default_rng(seed)
+
+    selected = []
+
+    for cls in np.unique(labels):
+        cls_idx = indices[labels == cls]
+        rng.shuffle(cls_idx)
+
+        if max_per_class is None:
+            selected.extend(cls_idx)
+        else:
+            selected.extend(cls_idx[:max_per_class])
+
+    return np.array(selected)
