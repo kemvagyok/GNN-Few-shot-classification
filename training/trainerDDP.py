@@ -1,14 +1,12 @@
 import time
-
 import wandb
 import torch
 import torch.distributed as dist
 from torch_geometric.loader import NeighborLoader
 
-
 class TrainerDDP:
     def __init__(self, embedder, gnn, graph_builder,  criterion,
-                 config, device, local_rank=0, world_size=1, metric_fn=None):
+                 config, device, local_rank=0, metric_fn=None):
 
         self.embedder = embedder.to(device)
         self.graph_builder = graph_builder
@@ -17,7 +15,7 @@ class TrainerDDP:
         self.config = config
         self.device = device
         self.rank = local_rank
-        self.world_size = world_size
+        self.world_size = dist.get_world_size()
 
         self.criterion = criterion.to(device)
         self.metric_fn = metric_fn
@@ -36,11 +34,14 @@ class TrainerDDP:
         tensor /= self.world_size
         return tensor
 
-    def train(self, train_dataset, val_dataset=None, K_hop=None):
+    def train(self, train_dataset, val_dataset=None, test_dataset=None, K_hop=None):
         best_val_acc = 0
 
         for epoch in range(self.config.epochs_max):
-            train_loss = self._train_epoch(train_dataset, K_hop)
+            train_loss = self._train_epoch(
+                labeled_dataset = train_dataset, 
+                unlabeled_dataset = val_dataset,
+                K_hop = K_hop)
 
             if val_dataset is not None:
                 val_loss, val_metric = self.evaluate(val_dataset)
@@ -62,6 +63,15 @@ class TrainerDDP:
             else:
                 if self._is_main():
                     print(f"[Epoch {epoch}] Train Loss: {train_loss:.4f}")
+
+        if test_dataset is not None:
+            test_loss, test_metric = self.evaluate(test_dataset)
+
+            print(f"Test Loss: {test_loss:.4f} | Test Metric: {test_metric:.4f}")
+            wandb.log({
+                "test_loss": test_loss,
+                "test_metric": test_metric
+            })   
 
         return best_val_acc
 
@@ -164,7 +174,7 @@ class TrainerDDP:
         preds = torch.argmax(outputs, dim=1)
 
         if self.metric_fn is not None:
-            metric_value = self.metric_fn(preds, y)
+            metric_value = self.metric_fn(preds, y, dataset.base.class_num)
         else:
             metric_value = (preds == y).float().mean()
 

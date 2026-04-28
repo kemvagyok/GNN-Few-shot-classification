@@ -16,7 +16,6 @@ graph:
   K_neigh: 3
   K_hop_list: [1, 2, 3, 4, 5]
   graph_refresh: 10
-  rebuild_graph_each_epoch: true
 
 training:
   train_mode: "embedding_only" # "full", "embedding_only"

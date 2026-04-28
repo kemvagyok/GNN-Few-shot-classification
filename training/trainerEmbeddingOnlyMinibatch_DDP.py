@@ -179,7 +179,7 @@ class TrainerEmbeddingOnlyMinibatch_DDP:
         loss_tensor /= self.world_size
 
         if self.metric_fn is not None:
-            metric_value = self.metric_fn(preds.cpu(), y_all.cpu())
+            metric_value = self.metric_fn(preds.cpu(), y_all.cpu(), loader.dataset.base.class_num)
         else:
             metric_value = (preds.argmax(dim=1) == y_all).float().mean().item()
 

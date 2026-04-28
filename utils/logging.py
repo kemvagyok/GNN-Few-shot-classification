@@ -3,13 +3,13 @@ from utils.ddp_utils import is_main_process
 import wandb
 
 @contextmanager
-def wandb_run(config, is_ddp, run_id, K_hop, max_label, mode, train_size, val_size, test_size):
+def wandb_run(config, is_ddp, run_id, K_hop, max_label, train_size, val_size, test_size):
     if is_ddp and not is_main_process():
         yield None
         return
 
     run = wandb.init(
-        project=f"few-shot-gnn-{config.dataset_name}_{config.train_mode}_{'ddp' if is_ddp else 'single'}_proba",
+        project=f"fewshotgnn_{config.dataset_name}_{config.train_mode}_{'ddp' if is_ddp else 'single'}_{'embedding_minibatch' if config.embedding_minibatch else 'embedding_full'}_{'gnn_minibatch' if config.gnn_minibatch else 'gnn_full'}",
         name=f"run_{run_id}",
         group="fullbatch" if K_hop is None else f"k_hop_{K_hop}",
         config={

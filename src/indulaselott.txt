@@ -3,3 +3,10 @@ singularity exec --nv --env OMP_NUM_THREADS=4 --bind /project/c_gnn42/GNN-Few-sh
 export SSL_CERT_FILE=$(python -m certifi)
 cd workspace
 PYTHONPATH=$(pwd) WANDB_MODE=disabled python src/main.py -config_fn mnist
+
+
+module load singularity
+singularity exec --nv --env OMP_NUM_THREADS=4 --bind ./:/home/$USER/workspace ./containers/fewshotgnn.sif /bin/bash
+export SSL_CERT_FILE=$(python -m certifi)
+cd workspace
+PYTHONPATH=$(pwd) WANDB_MODE=disabled python src/mainMemoryFriendly.py -config_fn mnist

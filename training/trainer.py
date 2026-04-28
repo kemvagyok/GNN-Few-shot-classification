@@ -27,8 +27,6 @@ class Trainer:
                 unlabeled_dataset = val_dataset,
                 K_hop = K_hop)
             if val_dataset is not None:
-                val_loss, val_acc = self.evaluate(val_dataset)
-
                 val_loss, val_metric = self.evaluate(val_dataset)
 
                 print(f"[Epoch {epoch}] "
@@ -42,8 +40,8 @@ class Trainer:
                     "val_metric": val_metric
                 }, step=epoch)
 
-                if val_acc > best_val_acc:
-                    best_val_acc = val_acc
+                if val_metric > best_val_acc:
+                    best_val_acc = val_metric
             else:
                 print(f"[Epoch {epoch}] Train Loss: {train_loss:.4f}")
 
@@ -68,7 +66,7 @@ class Trainer:
         inputs, y, train_idx, val_idx = self._merge_datasets(data_labeled, data_unlabeled)
         total_loss = 0
         #MINIBATCH TRAINING: build the full graph once, then sample many small subgraphs for training
-        if self.config.use_minibatch:
+        if self.config.gnn_minibatch:
             # Build graph topology only — embeddings stay on CPU, freed immediately after
             with torch.no_grad():
                 embeddings_for_graph = self._embed_chunked(inputs)
@@ -177,7 +175,7 @@ class Trainer:
         loss = self.criterion(outputs, y)
         preds = torch.argmax(outputs, dim=1)
         if self.metric_fn is not None:
-            metric_value = self.metric_fn(preds, y, num_classes = dataset.num_class)
+            metric_value = self.metric_fn(preds, y, num_classes = dataset.base.class_num)
         else:
             metric_value = (preds == y).sum().item() / y.size(0)
 

@@ -38,64 +38,49 @@ from utils import (
 )
 
 def get_trainer(is_ddp, embedder, gnn, criterion, metrics, config, device, local_rank):
-        
-    if not is_ddp:
-        return Trainer(
-        embedder=embedder,
-        gnn=gnn,
-        graph_builder=graph_builder,
-        criterion=criterion,
-        config=config,
-        device=device,
-        metric_fn=metrics
-    )
+    if config.embedding_minibatch:
+        if not is_ddp:
+            return TrainerEmbeddingGNNMinibatch(
+            embedder=embedder,
+            gnn=gnn,
+            criterion=criterion,
+            config=config,
+            device=device,
+            metric_fn=metrics
+        )
+        else:
+            return TrainerEmbeddingGNNMinibatch_DDP(
+                embedder=embedder,
+                gnn=gnn,
+                criterion=criterion,
+                config=config,
+                local_rank=local_rank,
+                metric_fn=metrics,
+                device=device
+            )
     else:
-        return TrainerDDP(
+        if not is_ddp:
+            return Trainer(
             embedder=embedder,
             gnn=gnn,
             graph_builder=graph_builder,
             criterion=criterion,
             config=config,
-            local_rank=local_rank,
-            metric_fn=metrics,
-            world_size=dist.get_world_size(),
-            device=device
+            device=device,
+            metric_fn=metrics
         )
+        else:
+            return TrainerDDP(
+                embedder=embedder,
+                gnn=gnn,
+                graph_builder=graph_builder,
+                criterion=criterion,
+                config=config,
+                local_rank=local_rank,
+                metric_fn=metrics,
+                device=device
+            )
 
-
-def measure_training_time(trainer, train_data, val_data, test_data, is_ddp, local_rank=0):
-    """
-    Kiszámolja a betanítási időt, figyelembe véve a GPU aszinkron működését és a DDP rankokat.
-    """
-    # 1. GPU szinkronizáció a pontos indításhoz
-    if torch.cuda.is_available():
-        torch.cuda.synchronize()
-        
-    start_time = time.time()
-
-    # 2. Betanítás futtatása
-    best_val = trainer.train(
-        train_dataset=train_data,
-        val_dataset=val_data,
-        test_dataset=test_data
-    )
-
-    # 3. GPU szinkronizáció a pontos leállításhoz
-    if torch.cuda.is_available():
-        torch.cuda.synchronize()
-        
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-
-    # 4. Eredmény kiírása csak a fő folyamaton (Non-DDP esetén mindig, DDP esetén ha rank == 0)
-    if not is_ddp or (is_ddp and local_rank == 0):
-        mode_str = "DDP" if is_ddp else "Single GPU / CPU"
-        print(f"\n{'='*40}")
-        print(f"[{mode_str}] Futási idő: {elapsed_time:.2f} másodperc ({elapsed_time/60:.2f} perc)")
-        print(f"Legjobb validációs metrika: {best_val:.4f}")
-        print(f"{'='*40}\n")
-
-    return best_val, elapsed_time
 
 # ---------------- CONFIG ----------------
 
@@ -126,6 +111,9 @@ train_dataset, val_dataset, test_dataset, meta = get_dataset(
     transform=build_transform(
         grayscale=grayscale
     ),
+    train_size=train_size,
+    val_size=val_size,
+    test_size=test_size
 )
 """
 train_dataset, val_dataset, test_dataset, meta = get_datasetInMemory(
@@ -138,8 +126,10 @@ train_dataset, val_dataset, test_dataset, meta = get_datasetInMemory(
             val_size=val_size,
             test_size=test_size,
         )
-
-print(set(train_dataset.indices) & set(val_dataset.indices))
+#META:
+# - n_classes
+# - n_Channels
+# - labels
 
 # ---------------- SPLITTING ----------------
 # labels a full datasetből
@@ -167,14 +157,13 @@ metrics = build_metrics(config)
 best_results = []
 train_dataset_original_indices = train_dataset.indices
 for max_label in config.train_images_per_class:
-        K_hops = [None] if not config.use_minibatch else K_hop_list
-        K_hops = [None] if config.train_mode == "embedding_only" else K_hop_list
+        K_hops = [None] if (config.train_mode == "embedding_only" or (not config.gnn_minibatch)) else K_hop_list
         if max_label == -1:
-             train_idx = build_indices(labels[train_dataset_original_indices], max_per_class=len(train_dataset.indices))
-        train_idx = build_indices(labels[train_dataset.indices], max_per_class=max_label)
+             train_idx = build_indices(labels[train_dataset_original_indices], max_per_class=len(train_dataset_original_indices))
+        train_idx = build_indices(labels[train_dataset_original_indices], max_per_class=max_label)
         train_dataset = IndexedDataset(train_dataset.base, train_idx)
         for K_hop in K_hops:
-            with wandb_run(config, is_ddp, run_id, K_hop, max_label, None, train_size, val_size, test_size):
+            with wandb_run(config, is_ddp, run_id, K_hop, max_label, train_size, val_size, test_size):
                 # ---------------- MODELS ----------------
                 embedder, gnn = initalizeModels(
                     config=config,
@@ -201,13 +190,3 @@ if is_main_process():
 
 if is_ddp:
     dist.destroy_process_group()
-
-# A korábban megírt mérőfüggvény hívása
-best_val, exec_time = measure_training_time(
-    trainer=trainer,
-    train_data=train_dataset,
-    val_data=val_dataset,
-    test_data=test_dataset,
-    is_ddp=is_ddp,
-    local_rank=local_rank if is_ddp else 0
-)

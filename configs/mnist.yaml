@@ -8,35 +8,33 @@ dataset:
   dataset_name: "MNIST"  # "ISIC2019", "ChestX", "MNIST"
   train_images_per_class: [1, 2, 5, 10, 20, 50, 100, -1] # -1 means using all available images for training
   img_size : 28
+  train_size: 0.8
   test_size: 0.2
-  val_size: 0.2
-  train_file_size: -1
-  test_file_size: -1
-  use_minibatch: true
-  without_valid: false
-
+  val_size: 0.1
+  from: "memory" #disk, memory
+  
 graph:
   K_neigh: 3
   K_hop_list: [1, 2, 3, 4, 5]
   graph_refresh: 1
-  rebuild_graph_each_epoch: true
 
 training:
   train_mode: "full" # "full", "embedding_only"
+
+  embedding_minibatch: false #Lassúbb, rosszabb, ha igaz
+  gnn_minibatch: true
   embedding: "cnn" #cnn, resnet18, resnet50
+  embedding_train_mode: "minibatch" #full, minibatch
   gnn_model: "gatv2conv" #gcnconv, gatv2conv
   lr_embedder: 0.01
   lr_gcn: 0.01
   epochs_max: 1500
   batch_size: 128
   criterion: "cross_entropy" # "cross_entropy", "focal_loss"
-  metrics: "accuracy" # "accuracy", "macro_f1"
+  metrics: "macro_f1" # "accuracy", "macro_f1"
   patience: 10
   delta: 0.001
   use_class_weights: false
-similarity:
-  # method_similar: "p_norm"
-  # p_n_vectors: [1, 2, 3]
 
 model:
   latens_size: 64
