@@ -3,15 +3,18 @@ from utils.ddp_utils import is_main_process
 import wandb
 
 @contextmanager
-def wandb_run(config, is_ddp, run_id, K_hop, max_label, train_size, val_size, test_size):
+def wandb_run(config, is_ddp, run_id, K_hop, max_label):
     if is_ddp and not is_main_process():
         yield None
         return
-
+    
+    project_name=f"fewshootgnn_{config.dataset_name}_{'ddp' if is_ddp else 'single'}_{'embedding&GNN' if config.train_mode == 'full' else 'embedding'}"
+    
     run = wandb.init(
-        project=f"fewshotgnn_{config.dataset_name}_{config.train_mode}_{'ddp' if is_ddp else 'single'}_{'embedding_minibatch' if config.embedding_minibatch else 'embedding_full'}_{'gnn_minibatch' if config.gnn_minibatch else 'gnn_full'}",
+        settings=wandb.Settings(init_timeout=config.wandb_init_timeout),
+        mode=config.wandb_mode,
+        project=project_name,
         name=f"run_{run_id}",
-        group="fullbatch" if K_hop is None else f"k_hop_{K_hop}",
         config={
             "dataset": config.dataset_name,
             "K_hop": K_hop,
@@ -20,11 +23,12 @@ def wandb_run(config, is_ddp, run_id, K_hop, max_label, train_size, val_size, te
             "metrics": config.metrics,
             "embedding": config.embedding,
             "gnn_model": config.gnn_model,
-            "train_size": train_size,
-            "val_size": val_size,
-            "test_size": test_size,
+            "train_size": config.train_size,
+            "val_size": config.val_size,
+            "test_size": config.test_size,
             "patience": config.patience,
-            "delta": config.delta
+            "delta": config.delta,
+            "isFreeze": config.isFreeze
         }
     )
 
@@ -32,3 +36,7 @@ def wandb_run(config, is_ddp, run_id, K_hop, max_label, train_size, val_size, te
         yield run
     finally:
         wandb.finish()
+
+
+def wandb_logging(logs: dict):
+    pass

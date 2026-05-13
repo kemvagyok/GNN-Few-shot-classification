@@ -5,8 +5,9 @@ from ..registry import register_embedding
 
 @register_embedding("cnn")
 class CnnModel(nn.Module):
-    def __init__(self, output_dim, channel_size):
+    def __init__(self, output_dim, channel_size, isFreeze=False, isClassificator = False):
         super().__init__()
+        self.isClassificator = isClassificator
         self.conv1 = nn.Conv2d(channel_size, 32,  kernel_size=3, stride=2, padding=1) # 14 x 14
         self.bn1 = nn.BatchNorm2d(32)
         self.conv2 = nn.Conv2d(32, 64,  kernel_size=3, stride=2, padding=1) # 7 x 7

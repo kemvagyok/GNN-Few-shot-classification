@@ -1,0 +1,46 @@
+paths:
+  dataset_path: "./data"
+  logs_path: "./logs"
+  results_path: "./results"
+
+dataset:
+  dataset_type: "tabular"  # "image", "text", tabular
+  dataset_name: "UNSW"  # "UNSW"
+  train_images_per_class: [1, 2] # -1 means using all available images for training
+  img_size : 0
+  train_size: 0.7
+  test_size: 0.2
+  val_size: 0.1
+  fromType: "memory" #disk, memory
+
+graph:
+  K_neigh: 3
+  K_hop_list: [1, 2, 3, 4, 5]
+  graph_refresh: 20
+  graph_builder: "faiss" # faiss, faiss_gpu, pytorch
+
+training:
+  train_mode: "full" # "full", "embedding_only"
+  embedding: "simple" # simple
+  gnn_model: "gatv2conv" #gcnconv, gatv2conv
+  lr_embedder: 0.01
+  lr_gcn: 0.01
+  epochs_max: 1500
+  batch_size: 128
+  criterion: "cross_entropy" # "cross_entropy", "focal_loss"
+  metrics: "macro_f1" # "accuracy", "macro_f1"
+  patience: 200
+  delta: 0.001
+  use_class_weights: false
+  isFreeze: false
+  
+model:
+  latens_size: 64
+  model_embedder_save_path: "./models/checkpoints/"
+  
+reproducibility:
+  seed: 42
+
+wandb:
+  wandb_mode: 'disabled' # 'online', 'offline', 'disabled', 'shared'
+  wandb_init_timeout: 300

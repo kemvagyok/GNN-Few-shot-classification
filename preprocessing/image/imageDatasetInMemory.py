@@ -25,6 +25,7 @@ class ImageDatasetInMemory(Dataset):
             },
             "labels": y
         }
+    
     def get_all(self, indices):
                 return {
             "inputs": {

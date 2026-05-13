@@ -1,5 +1,6 @@
 from .embedding.BERTModel import *
 from .embedding.cnnModel import *
+from .embedding.simpleModel import *
 from .embedding.resnet18Model import *
 from .embedding.resnet50Model import *
 from .embedding.QWENModel import *

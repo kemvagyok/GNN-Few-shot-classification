@@ -11,7 +11,7 @@ def macro_f1(preds, targets, num_classes=8, eps=1e-8):
         num_classes = max(preds.max(), targets.max()) + 1
 
     conf_mat = torch.zeros((num_classes, num_classes), device=preds.device)
-
+    
     conf_mat.index_put_(
         (targets, preds),
         torch.ones_like(targets, dtype=torch.float),

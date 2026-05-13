@@ -6,19 +6,21 @@ import torch.nn.functional as F
 
 @register_embedding("qwen")
 class QwenEmbeddingModel(nn.Module):
-    def __init__(self, model_name="Qwen/Qwen3-Embedding-0.6B", freeze_model=False):
+    def __init__(self, output_dim, model_name="Qwen/Qwen3-Embedding-0.6B", isFreeze=False, isClassificator = False):
         super().__init__()
         
+        self.isClassificator = isClassificator
+
         # A Qwen modellekhez a generikus AutoModel-t használjuk
         self.model = AutoModel.from_pretrained(model_name)
         
-        if freeze_model:
+        if isFreeze:
             for param in self.model.parameters():
                 param.requires_grad = False
 
         # A Qwen3-Embedding-0.6B alapértelmezett kimeneti dimenziója (hidden_size) 1024.
-        # Ezt vetítjük le 64 dimenzióra.
-        self.fc = nn.Linear(self.model.config.hidden_size, 64) 
+        # Ezt vetítjük le adott méretű dimenzióra.
+        self.fc = nn.Linear(self.model.config.hidden_size, output_dim) 
 
     def forward(self, input_ids, attention_mask):
         # Mivel ez az alap AutoModel, nem adunk vissza LM head logitokat, csak a rejtett állapotokat.
@@ -43,5 +45,6 @@ class QwenEmbeddingModel(nn.Module):
         
         # Vektor levetítése 64 dimenzióra
         latent_vector = self.fc(pooled_output)
-        latent_vector = F.normalize(latent_vector, p=2, dim=1)
+        if self.isClassificator:
+            latent_vector = F.normalize(latent_vector, p=2, dim=1)
         return latent_vector

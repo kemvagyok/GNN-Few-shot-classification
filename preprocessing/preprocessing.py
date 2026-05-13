@@ -36,7 +36,7 @@ def apply_remedial(df, label_cols):
 # =========================================================
 # ISIC2019
 # =========================================================
-class ISIC2019Dataset(ImagesDataModule):
+class ISIC2019_loading(ImagesDataModule):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.csv_path = os.path.join(self.path, "ISIC_2019_Training_GroundTruth.csv")
@@ -66,7 +66,7 @@ class ISIC2019Dataset(ImagesDataModule):
 # =========================================================
 # ChestX
 # =========================================================
-class ChestXDataset(ImagesDataModule):
+class ChestX_loading(ImagesDataModule):
     def __init__(self, multilabel=False, **kwargs):
         super().__init__(**kwargs)
         self.csv_path = os.path.join(self.path, "Data_Entry_2017.csv")
@@ -100,8 +100,10 @@ class ChestXDataset(ImagesDataModule):
         x, y = self.load_images(paths, labels)
 
         return x, y, len(classes), (1 if self.grayscale else 3)
-
-class MNISTDatasetA(ImagesDataModule):
+# =========================================================
+# MNIST
+# =========================================================
+class MNIST_loading(ImagesDataModule):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
@@ -136,8 +138,10 @@ class MNISTDatasetA(ImagesDataModule):
         n_channels = 1
 
         return x, y, n_classes, n_channels
-
-class AGNewsDataset(TextDataModule):
+# =========================================================
+# AGNews
+# =========================================================
+class AGNews_loading(TextDataModule):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.csv_train_path = os.path.join(self.path, "train.csv")
@@ -166,8 +170,10 @@ class AGNewsDataset(TextDataModule):
         num_classes = len(y.unique())
 
         return x, y, num_classes, None
-
-class DBpedia(TextDataModule):
+# =========================================================
+# DBpedia
+# =========================================================
+class DBpedia_loading(TextDataModule):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Beállítjuk a fájl elérési útját (a te esetedben test.csv)
@@ -198,19 +204,60 @@ class DBpedia(TextDataModule):
 
         # Visszatérünk az adatokkal (x, y, osztályok száma, validációs adatok)
         return x, y, num_classes, None
+
+# =========================================================
+# UNSW
+# =========================================================
+
+class UNSW_loading:
+    def __init__(self, path_raw, **kwargs):
+        self.path = path_raw
+        self.csv_train_path = os.path.join(self.path, "UNSW_NB15_training-set.csv")
+        self.csv_test_path = os.path.join(self.path, "UNSW_NB15_testing-set.csv")
+    def load(self):
+        train_df = pd.read_csv(self.csv_train_path)
+        test_df  = pd.read_csv(self.csv_test_path)
+        df = pd.concat((train_df,test_df))
+        labels = df['label'].values
+        num_classes = len(df['label'].value_counts())
+        return df, labels, num_classes, None
+# =========================================================
+# 
+# =========================================================
+
+class LendingClub_loading:
+    def __init__(self, path_raw, **kwargs):
+        self.path = path_raw
+        self.csv_accepted_path = os.path.join(self.path, "accepted_2007_to_2018Q4.csv")
+        #self.csv_rejected_path = os.path.join(self.path, "rejected_2007_to_2018Q4.csv")
+    def load(self):
+        train_df = pd.read_csv(self.csv_accepted_path)
+        #test_df  = pd.read_csv(self.csv_rejected_path)
+        #df = pd.concat((train_df,test_df))
+        df = train_df
+
+        df["label"] = (df["loan_status"] == "Charged Off").astype(int)
+        labels = df['label'].values
+        num_classes = len(df['label'].value_counts())
+
+
+        return df, labels, num_classes, None
+
 # =========================================================
 # Factory
 # =========================================================
 def get_dataset_class(name):
     if name == "ISIC2019":
-        return ISIC2019Dataset
+        return ISIC2019_loading
     elif name == "ChestX":
-        return ChestXDataset
+        return ChestX_loading
     elif name == "MNIST":
-        return MNISTDatasetA
+        return MNIST_loading
     elif name == "AGNews":
-        return AGNewsDataset
+        return AGNews_loading
     elif name == "DBpedia":
-        return DBpedia
+        return DBpedia_loading
+    elif name == "UNSW":
+        return UNSW_loading
     else:
         raise ValueError("Unknown dataset: {}".format(name))

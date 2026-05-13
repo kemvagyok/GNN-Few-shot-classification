@@ -22,3 +22,12 @@ class TextDatasetInMemory(Dataset):
             },
             "labels": self.labels[idx]
         }
+    
+    def get_all(self, indices):
+        return {
+            "inputs": {
+                "input_ids": self.texts[indices],
+                "attention_mask": self.attention_masks[indices]
+            },
+            "labels": self.labels[indices]
+        }

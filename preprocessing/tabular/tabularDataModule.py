@@ -3,7 +3,7 @@ import torch
 import tqdm
 from PIL import Image
 
-class ImagesDataModule:
+class tabularDataModule:
     def __init__(self, path_raw, transform):
         self.path = path_raw
         self.img_dir = os.path.join(path_raw, "images")

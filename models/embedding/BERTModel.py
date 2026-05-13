@@ -7,14 +7,15 @@ import torch.nn.functional as F
 
 @register_embedding("bert")
 class BERTModel(nn.Module):
-    def __init__(self, model_name="bert-base-uncased", freeze_bert=False):
+    def __init__(self, output_dim, model_name="bert-base-uncased", isFreeze=False, isClassificator = False):
         super().__init__()
+        self.isClassificator = isClassificator
         self.bert = BertModel.from_pretrained(model_name)
-        if freeze_bert:
+        if isFreeze:
             for param in self.bert.parameters():
                 param.requires_grad = False
 
-        self.fc = nn.Linear(self.bert.config.hidden_size, 64)  # 768 → 64
+        self.fc = nn.Linear(self.bert.config.hidden_size, output_dim)  # 768 → output_dim
     def forward(self, input_ids, attention_mask):
         outputs = self.bert(input_ids=input_ids,
                             attention_mask=attention_mask)

@@ -2,18 +2,12 @@ import os
 import numpy as np
 from sklearn.model_selection import train_test_split
 import torch
-from torch.utils.data import Subset
 
 from preprocessing.preprocessingInDisk import (
-    AGNewsPreprocessing,
-    DBpediaPreprocessing,
     ISIC2019Preprocessing,
-    MNISTPreprocessing
 )
 
-from .imageDataset import ImageDataset
-from .textDatasetInMemory import TextDatasetInMemory
-from .mnistDataset import MNISTDataset
+from .image.imageDataset import ImageDataset
 from .indexedDataset import IndexedDataset
 
 def stratified_split(labels, train_size, val_size, test_size, seed=42):
@@ -53,8 +47,8 @@ def get_dataset(
     # ---------------- ISIC ----------------
     if dataset_name == "ISIC2019":
         images, labels, n_classes, n_channels = ISIC2019Preprocessing().load(
-            csv_path=os.path.join(data_pth, dataset_name, "ISIC_2019_Training_GroundTruth.csv"),
-            img_dir=os.path.join(data_pth, dataset_name, "images")
+            csv_path=os.path.join(data_pth, "raw",dataset_name, "ISIC_2019_Training_GroundTruth.csv"),
+            img_dir=os.path.join(data_pth,"raw", dataset_name, "images")
         )
 
         full_dataset = ImageDataset(
@@ -62,53 +56,11 @@ def get_dataset(
             labels=labels,
             class_num=n_classes,
             n_channels=n_channels,
-            img_full_dir=os.path.join(data_pth, dataset_name, "images"),
+            img_full_dir=os.path.join(data_pth, "raw", dataset_name, "images"),
             transform=transform
         )
-
-    # ---------------- MNIST ----------------
-    elif dataset_name == "MNIST":
-        images, labels, n_classes, n_channels = MNISTPreprocessing().load(
-            path=data_pth,
-            transform=transform
-        )
-
-        full_dataset = MNISTDataset(
-            images=images,
-            labels=labels,
-            class_num=n_classes,
-            n_channels=n_channels
-        )
-
-    # ---------------- TEXT ----------------
-    elif dataset_name == "AGNews":
-        encoded_texts, attention_masks, labels, num_classes, _ = AGNewsPreprocessing().load(
-            csv_train_path=os.path.join(data_pth, dataset_name, "train.csv"),
-            csv_test_path=os.path.join(data_pth, dataset_name, "test.csv")
-        )
-
-        full_dataset = TextDatasetInMemory(
-            encoded_texts=encoded_texts,
-            attention_masks=attention_masks,
-            labels=labels,
-            class_num=num_classes
-        )
-
-    elif dataset_name == "DBpedia":
-        encoded_texts, attention_masks, labels, num_classes, _ = DBpediaPreprocessing().load(
-            csv_train_path=os.path.join(data_pth, dataset_name, "train.csv"),
-            csv_test_path=os.path.join(data_pth, dataset_name, "test.csv")
-        )
-
-        full_dataset = TextDatasetInMemory(
-            encoded_texts=encoded_texts,
-            attention_masks=attention_masks,
-            labels=labels,
-            class_num=num_classes
-        )
-
     else:
-        raise ValueError(f"Unknown dataset: {dataset_name}")
+        raise ValueError(f"Unknown dataset: {dataset_name} or this dataset is loaded from only memory (cached).")
 
     # ---------------- SPLIT ----------------
     train_idx, val_idx, test_idx = stratified_split(
@@ -123,7 +75,7 @@ def get_dataset(
     test_dataset = IndexedDataset(full_dataset, test_idx)
 
     meta = {
-        "class_num": n_classes if dataset_name in ["ISIC2019", "MNIST"] else num_classes,
+        "class_num": n_classes,
         "labels": labels,
         "n_channels": n_channels
     }

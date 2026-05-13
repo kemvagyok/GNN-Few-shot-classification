@@ -1,8 +1,8 @@
 import torch
 from torch.utils.data import DataLoader
 import wandb
-
-class TrainerEmbeddingOnlyMinibatch:
+from utils import EarlyStopping
+class TrainerOnlyEmbedding:
     def __init__(self, embedder, criterion, config, device, metric_fn=None):
         self.embedder = embedder.to(device)
         self.device = device
@@ -25,6 +25,8 @@ class TrainerEmbeddingOnlyMinibatch:
 
     def train(self, train_dataset, val_dataset=None, test_dataset=None, **kwargs):
         train_loader = self._create_loader(train_dataset, shuffle=True)
+
+        stopper = EarlyStopping(self.config.patience)
 
         if val_dataset is not None:
             val_loader = self._create_loader(val_dataset, shuffle=False)
@@ -50,13 +52,12 @@ class TrainerEmbeddingOnlyMinibatch:
 
                 if val_metric > best_val_metric:
                     best_val_metric = val_metric
+
+                if stopper.early_stop(val_loss): #Korai leállás
+                    print(f"Early stopping! Epoch: {epoch}")
+                    break
             else:
                 print(f"[Epoch {epoch}] Train Loss: {train_loss:.4f}")
-
-        torch.save(
-            self.embedder.state_dict(),
-            f"{self.config.model_embedder_save_path}/model.pth"
-        )
 
         if test_dataset is not None:
             test_loader = self._create_loader(test_dataset, shuffle=False)
@@ -127,12 +128,12 @@ class TrainerEmbeddingOnlyMinibatch:
             all_preds.append(embeddings.detach())
             all_y.append(y.detach())
 
-        preds = torch.cat(all_preds)
+        all_preds = torch.cat(all_preds)
         y_all = torch.cat(all_y)
 
         if self.metric_fn is not None:
-            metric_value = self.metric_fn(preds.cpu(), y_all.cpu(), loader.dataset.base.class_num)
+            metric_value = self.metric_fn(all_preds.cpu(), y_all.cpu(), loader.dataset.base.class_num)
         else:
-            metric_value = (preds.argmax(dim=1) == y_all).float().mean().item()
+            metric_value = (all_preds.argmax(dim=1) == y_all).float().mean().item()
 
         return total_loss / max(num_batches, 1), metric_value

@@ -1,14 +1,24 @@
 import os
 import torch
 from .preprocessing import get_dataset_class
-from .imageDatasetInMemory import ImageDatasetInMemory
-from .textDatasetInMemory import TextDatasetInMemory
+from .image.imageDatasetInMemory import ImageDatasetInMemory
+from .text.textDatasetInMemory import TextDatasetInMemory
+from .tabular.tabularDatasetInMemory import TabularDatasetInMemory
 from .indexedDataset import IndexedDataset
+from .tabular.UNSWPreprocessing import UNSWPreprocessor
+from .tabular.lendingClubPreprocessing import LendingClubPreprocessor
 from sklearn.model_selection import train_test_split
 import numpy as np
+import pandas as pd
+from typing import Tuple
 
-
-def stratified_split(labels, train_size, val_size, test_size, seed=42):
+def stratified_split(labels: np.ndarray[int], 
+                     train_size: int,
+                      val_size: int, 
+                      test_size: int, 
+                      seed: int
+                     ) -> Tuple[np.ndarray[int], np.ndarray[int], np.ndarray[int]]:
+    
     indices = np.arange(len(labels))
     labels = np.array(labels)
     train_idx, temp_idx = train_test_split(
@@ -36,14 +46,14 @@ def stratified_split(labels, train_size, val_size, test_size, seed=42):
 # GENERIC LOADER
 # =========================================================
 def get_datasetInMemory(
-    dataset_name,
-    data_pth,
-    files_size=4000,
-    img_size=28,
-    force_reload=False,
-    train_size=0.7,
-    val_size=0.1,
-    test_size=0.2,
+    dataset_name: str,
+    data_pth: str,
+    seed: int,
+    img_size: int = 28,
+    force_reload: bool=False,
+    train_size: int = 0.7,
+    val_size: int = 0.1,
+    test_size: int = 0.2,
     **kwargs
 ):
     cache_path = os.path.join(
@@ -51,9 +61,11 @@ def get_datasetInMemory(
         f"preprocessed/{dataset_name}_data_{img_size}.pt"
     )
 
-    if os.path.exists(cache_path) and not force_reload:
+    if os.path.exists(cache_path) and not force_reload and (not dataset_name == "UNSW"):
+        
         print(f"Loading cached {dataset_name}...")
         data = torch.load(cache_path)
+
     else:
         print(f"Processing {dataset_name} from source...")
 
@@ -77,25 +89,35 @@ def get_datasetInMemory(
             "n_channels": data_tuple[3],
         }
 
-        torch.save(data, cache_path)
-
-    # ===== közös feldolgozás =====
-    n_classes = data["n_classes"]
-    n_channels = data["n_channels"]
-    labels = data["y"]
-
+        if dataset_name not in ["UNSW", "LENDING_CLUB"]:
+            torch.save(data, cache_path)
+        
     full_dataset = get_dataset_dataset(
         dataset_name,
         data
     )
+    # ===== közös feldolgozás ===== 
+    n_classes = data["n_classes"]
+    n_channels = data["n_channels"]
+    labels = data["y"]
+    input_size = -1
 
     train_idx, val_idx, test_idx = stratified_split(
-        labels=labels,
-        train_size=train_size,
-        val_size=val_size,
-        test_size=test_size
+    labels=labels,
+    train_size=train_size,
+    val_size=val_size,
+    test_size=test_size,
+    seed=seed
     )
-
+    
+    if dataset_name in ["UNSW", "LENDING_CLUB"]:
+        train_df = full_dataset.df.iloc[train_idx]
+        prep = UNSWPreprocessor() if dataset_name == "UNSW" else LendingClubPreprocessor()
+        prep.fit(train_df)
+        full_df = pd.DataFrame(full_dataset.df)
+        X_all, y_all = prep.transform(full_df)
+        full_dataset.add_transformed(torch.tensor(X_all), torch.tensor(y_all), len(np.unique(y_all)))
+        input_size = X_all.shape[1]
     train_dataset = IndexedDataset(full_dataset, train_idx)
     val_dataset = IndexedDataset(full_dataset, val_idx)
     test_dataset = IndexedDataset(full_dataset, test_idx)
@@ -103,7 +125,8 @@ def get_datasetInMemory(
     meta = {
         "class_num": n_classes,
         "labels": labels,
-        "n_channels": n_channels
+        "n_channels": n_channels,
+        "input_size": input_size
     }
 
     return train_dataset, val_dataset, test_dataset, meta
@@ -118,6 +141,8 @@ def get_dataset_dataset(name, data):
         return dataLoading_AGNews(data)
     elif name == "DBpedia":
         return dataLoading_DBPedia(data)
+    elif name == "UNSW":
+        return dataLoading_UNSW(data)
     else:
         raise ValueError("Unknown dataset: {}".format(name))
 
@@ -179,4 +204,10 @@ def dataLoading_DBPedia(data):
         attention_masks=attention_masks,
         labels=labels,
         class_num=class_num
+    )
+
+def dataLoading_UNSW(data):
+    df = data["x"]
+    return TabularDatasetInMemory(
+        df=df
     )

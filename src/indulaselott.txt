@@ -6,7 +6,6 @@ PYTHONPATH=$(pwd) WANDB_MODE=disabled python src/main.py -config_fn mnist
 
 
 module load singularity
-singularity exec --nv --env OMP_NUM_THREADS=4 --bind ./:/home/$USER/workspace ./containers/fewshotgnn.sif /bin/bash
-export SSL_CERT_FILE=$(python -m certifi)
-cd workspace
-PYTHONPATH=$(pwd) WANDB_MODE=disabled python src/mainMemoryFriendly.py -config_fn mnist
+singularity exec --nv --bind ./:/home/$USER/workspace ./containers/fewshotgnn.sif /bin/bash
+conda activate /project/c_gnn42/GNN-Few-shot-classification/conda/envs/faiss_env
+PYTHONPATH=$(pwd) python src/main.py -config_fn mnist

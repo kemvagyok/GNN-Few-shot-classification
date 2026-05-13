@@ -7,10 +7,10 @@ from utils import EarlyStopping
 import wandb
 
 
-class TrainerEmbeddingOnlyMinibatch_DDP:
-    def __init__(self, embedder, criterion, config, rank, world_size, metric_fn=None):
+class TrainerOnlyEmbedding_DDP:
+    def __init__(self, embedder, criterion, config, rank, metric_fn=None):
         self.rank = rank
-        self.world_size = world_size
+        self.world_size = dist.get_world_size()
         self.device = torch.device(f"cuda:{rank}")
 
         self.embedder = embedder.to(self.device)

@@ -1,8 +1,7 @@
 from .trainer import Trainer
 from .trainerDDP import TrainerDDP
 
-from .trainerEmbeddingGNNMinibatch import TrainerEmbeddingGNNMinibatch
-from .trainerEmbeddingGNNMinibatch_DDP import TrainerEmbeddingGNNMinibatch_DDP
+from .trainerOnlyEmbedding import TrainerOnlyEmbedding
+from .trainerOnlyEmbedding_DDP import TrainerOnlyEmbedding_DDP
 
-from .trainerEmbeddingOnlyMinibatch import TrainerEmbeddingOnlyMinibatch
-from .trainerEmbeddingOnlyMinibatch_DDP import TrainerEmbeddingOnlyMinibatch_DDP
+from .trainerFactory import get_trainer

@@ -5,8 +5,8 @@ paths:
 
 dataset:
   dataset_type: "text"  # "image", "text"
-  dataset_name: "DBpedia"  # "AGNews", "DBpedia",
-  train_images_per_class: [1, 2, 5, 10, 20, 50, 100, -1]
+  dataset_name: "AGNews"  # "AGNews", "DBpedia",
+  train_images_per_class: [1, 2, 5, 10, 20, 50, 100, -1] # -1 means using all available images for training
   img_size : 0
   test_size: 0.2
   use_minibatch: true
@@ -16,24 +16,29 @@ graph:
   K_neigh: 3
   K_hop_list: [1, 2, 3, 4, 5]
   graph_refresh: 10
+  graph_builder: "faiss" # faiss, faiss_gpu, pytorch
 
 training:
   train_mode: "embedding_only" # "full", "embedding_only"
-  embedding: "bert" #bert, qwen
+  embedding: "qwen" #bert, qwen
   gnn_model: "gatv2conv" # gcnconv, gatv2conv
   lr_embedder: 0.0003
   lr_gcn: 0.0003
-  epochs_max: 2500
+  epochs_max: 1000
   batch_size: 32 #Neighbor sampling
   criterion: "cross_entropy" # "cross_entropy", "focal_loss"
   metrics: "accuracy" # "accuracy", "macro_f1"
-
-similarity:
-  # method_similar: "p_norm"
-  # p_n_vectors: [1, 2, 3]
+  patience: 100
+  delta: 0.001
+  use_class_weights: false
 
 model:
   latens_size: 64
   model_embedder_save_path: "./models/checkpoints/"
+
 reproducibility:
   seed: 42
+
+wandb:
+  wandb_mode: 'online' # 'online', 'offline', 'disabled', 'shared'
+  wandb_init_timeout: 300

@@ -6,7 +6,7 @@ from ..registry import register_embedding
 
 @register_embedding("resnet18")
 class Resnet18Model(nn.Module):
-    def __init__(self, output_dim=64, channel_size=3):
+    def __init__(self, output_dim, channel_size, isFreeze = False, isClassificator = False):
         super().__init__()
         resnet = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
 
@@ -30,12 +30,19 @@ class Resnet18Model(nn.Module):
 
         # --- 3) Utolsó FC eltávolítása ---
         self.features = nn.Sequential(*list(resnet.children())[:-1])
+        
+        if isFreeze:
+            for p in self.features.parameters():
+                p.requires_grad = False
+
         self.fc = nn.Linear(resnet.fc.in_features, output_dim)
 
     def forward(self, x):
         x = self.features(x)          # (B, 512, 1, 1)
         x = x.view(x.size(0), -1)
         x = self.fc(x)
-        x = F.normalize(x, p=2, dim=1)
+
+        if self.isClassificator:
+            x = F.normalize(x, p=2, dim=1)
         return x
     

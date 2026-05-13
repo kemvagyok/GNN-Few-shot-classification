@@ -6,25 +6,22 @@ paths:
 dataset:
   dataset_type: "image"  # "image", "text"
   dataset_name: "MNIST"  # "ISIC2019", "ChestX", "MNIST"
-  train_images_per_class: [1, 2, 5, 10, 20, 50, 100, -1] # -1 means using all available images for training
+  train_images_per_class: [1, 2, 5, 10, 20, 50, 100, -1]  # -1 means using all available images for training
   img_size : 28
   train_size: 0.8
   test_size: 0.2
   val_size: 0.1
-  from: "memory" #disk, memory
-  
+  fromType: "memory" #disk, memory
+
 graph:
   K_neigh: 3
   K_hop_list: [1, 2, 3, 4, 5]
-  graph_refresh: 1
+  graph_refresh: 20
+  graph_builder: "faiss_gpu" # faiss, faiss_gpu, pytorch
 
 training:
   train_mode: "full" # "full", "embedding_only"
-
-  embedding_minibatch: false #Lassúbb, rosszabb, ha igaz
-  gnn_minibatch: true
   embedding: "cnn" #cnn, resnet18, resnet50
-  embedding_train_mode: "minibatch" #full, minibatch
   gnn_model: "gatv2conv" #gcnconv, gatv2conv
   lr_embedder: 0.01
   lr_gcn: 0.01
@@ -32,13 +29,19 @@ training:
   batch_size: 128
   criterion: "cross_entropy" # "cross_entropy", "focal_loss"
   metrics: "macro_f1" # "accuracy", "macro_f1"
-  patience: 10
+  patience: 200
   delta: 0.001
   use_class_weights: false
-
+  isFreeze: false
+  subgraph_embedding_rebuilding: true
+  
 model:
   latens_size: 64
   model_embedder_save_path: "./models/checkpoints/"
   
 reproducibility:
   seed: 42
+
+wandb:
+  wandb_mode: 'online' # 'online', 'offline', 'disabled', 'shared'
+  wandb_init_timeout: 150

@@ -1,9 +1,16 @@
 import torch
 from torch.utils.data import Dataset
 import numpy as np
+#-----------
+from .image.imageDatasetInMemory import ImageDatasetInMemory
+from .tabular.tabularDatasetInMemory import TabularDatasetInMemory
+from .text.textDatasetInMemory import TextDatasetInMemory
+#-----------
 
 class IndexedDataset(torch.utils.data.Dataset):
-    def __init__(self, base, indices):
+    def __init__(self, 
+                 base: ImageDatasetInMemory|TabularDatasetInMemory|TextDatasetInMemory, 
+                 indices):
         self.base = base
         self.indices = np.array(indices)
 
@@ -17,3 +24,6 @@ class IndexedDataset(torch.utils.data.Dataset):
     
     def get_all(self):
         return self.base.get_all(self.indices)
+    
+    def fit(self): # FOR UNSW/tabular datasets
+        self.base.fit()

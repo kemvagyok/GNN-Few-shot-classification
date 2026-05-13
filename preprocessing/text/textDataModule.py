@@ -6,12 +6,22 @@ from sklearn.model_selection import train_test_split
 from transformers import AutoTokenizer
 
 class TextDataModule:
-    def __init__(self, path_raw, tokenizer_name="bert-base-uncased", max_len=128, **kwargs):
+    # 1. Változás: A default tokenizer nevet átírtuk egy Qwen modellre
+    def __init__(self, path_raw, tokenizer_name="Qwen/Qwen2.5-7B", max_len=128, **kwargs):
         self.path = path_raw
         self.max_len = max_len
 
-        # tokenizer (huggingface)
-        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+        # 2. Változás: betöltés (a trust_remote_code=True néha kell a Qwen modellekhez)
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            tokenizer_name, 
+            trust_remote_code=True
+        )
+
+        # 3. Változás: Padding token beállítása!
+        # A Qwen (és sok más modern LLM) nem rendelkezik dedikált [PAD] tokennel.
+        # Hogy a batch-elt padding működjön, be kell állítanunk a pad_tokent (általában az eos_token-re).
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
 
     def encode_texts(self, texts):
         encodings = self.tokenizer(
@@ -23,15 +33,3 @@ class TextDataModule:
         )
 
         return encodings['input_ids'], encodings['attention_mask']
-
-    @staticmethod
-    def split_data(texts, masks, labels, test_size=0.2, val_size=0.2):
-        train_x, test_x, train_m, test_m, train_y, test_y = train_test_split(
-            texts, masks, labels, stratify=labels, test_size=test_size, random_state=42
-        )
-
-        train_x, val_x, train_m, val_m, train_y, val_y = train_test_split(
-            train_x, train_m, train_y, test_size=val_size, random_state=42
-        )
-
-        return (train_x, train_m), (val_x, val_m), (test_x, test_m), train_y, val_y, test_y
