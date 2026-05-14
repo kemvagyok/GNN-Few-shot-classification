@@ -1,149 +1,40 @@
-from train import run_training
-from preprocessing.loadingModule import dataLoading_ChestX, dataLoading_ISIC2019, dataLoading_MNIST
-from utils import setup_device, is_main_process, set_seed
 from configs import Config
+
 import argparse
-import pandas as pd
-import numpy as np
-import torch
-import torch.distributed as dist
-import wandb
-from collections import Counter
-import os
 
-def init_wandb(config, is_ddp, run_id, K_hop, max_label, mode):
-    if not is_main_process():
-        return
+from utils import (
+    seed,
+    is_main_process,
+    save_results
+)
 
-    wandb.init(
-        project=f"few-shot-gnn-{config.dataset_name}_{'ddp' if is_ddp else 'without_ddp'}_{mode}",
-        name=f"run_{run_id}",
-        group="fullbatch" if K_hop is None else f"k_hop_{K_hop}",
-        config={
-            "dataset": config.dataset_name,
-            "embedding": config.embedding,
-            "gcn_model": config.gcn_model,
-            "K_hop": K_hop,
-            "max_label": max_label,
-            "epochs": config.epochs_max,
-            "lr_embedder": config.lr_embedder,
-            "lr_gcn": config.lr_gcn,
-            "batch_size": config.batch_size,
-            "K_neigh": config.K_neigh,
-            "is_ddp": is_ddp
-        },
-        reinit="finish_previous"
-    )
-
-def get_class_distribution(targets, num_classes=None):
-    """
-    targets: torch.Tensor vagy numpy array (N,)
-    """
-    if isinstance(targets, torch.Tensor):
-        targets = targets.cpu().numpy()
-
-    counter = Counter(targets)
-
-    if num_classes is not None:
-        return {i: counter.get(i, 0) for i in range(num_classes)}
-
-    return dict(counter)
-
-
-def print_distribution(dist, title="Distribution"):
-    print(f"\n--- {title} ---")
-    total = sum(dist.values()) if isinstance(dist, dict) else dist.sum()
-
-    if isinstance(dist, dict):
-        for k, v in dist.items():
-            print(f"Class {k}: {v} ({v/total:.2%})")
-    else:
-        for i, v in enumerate(dist):
-            print(f"Class {i}: {v} ({v/total:.2%})")
-
-def loading_dataset(dataset_name, **kwargs):
-    if dataset_name == "MNIST":
-        return dataLoading_MNIST(**kwargs)
-    elif dataset_name == "ChestX":
-        return dataLoading_ChestX(**kwargs)
-    elif dataset_name == "ISIC2019":
-        return dataLoading_ISIC2019(**kwargs)
-    else:
-        raise ValueError(f"Unknown dataset: {dataset_name}")
+from pipelineBuilder import PipelineBuilder
 
 def main():
+
     parsers = argparse.ArgumentParser()
     parsers.add_argument("-config_fn", type=str, default="mnist", help="Choosing a config name")
-    parsers.add_argument("-img_size", type=int, default=28, help="Choosing an image size")
-    parsers.add_argument("--run_id", type=int, default=0, help="ID for the current run (used for logging)")
+    parsers.add_argument("--run_id", type=int, default=0, help="ID for the current run (used for logging)") #SBATCH esetében a run_id-vel beállítjuk a seed-et.
     args = parsers.parse_args()
+    config = Config(f"./configs/files/{args.config_fn}.yaml")
 
-    config_filename = args.config_fn
-    img_size = args.img_size
-    run_id = args.run_id
+    config.seed = config.seed + args.run_id
 
-    config = Config(f"./configs/{config_filename}.yaml")
+    pipeline = (
+        PipelineBuilder(config)
+        .build_device()
+        .build_data()
+        .build_loss()
+        .build_metrics()
+        .get_pipeline()
+    )
 
-    K_hop_list = config.K_hop_list if  config.use_minibatch else [1]
-    device, local_rank, is_ddp = setup_device()
+    seed.set_seed(config.seed)
 
-    train_x, train_y, val_x, val_y, test_x, test_y, num_class, channel_size = \
-        loading_dataset(dataset_name = config.dataset_name, data_pth = config.dataset_path, img_size = img_size)
-    
-    print_distribution(get_class_distribution(targets = train_y, num_classes = num_class))
-
-    test_x_filtered = test_x[:config.test_size]
-    test_y_filtered = test_y[:config.test_size]
-    if config.without_valid:
-        train_x = torch.cat([train_x, val_x], dim=0)
-        train_y = torch.cat([train_y, val_y], dim=0)
-        val_x = test_x[:config.test_size]
-        val_y = test_y[:config.test_size]
-        test_x_filtered = None 
-        test_y_filtered = None
-
-    best_results = []
-
-    mode = "fullbatch" if not config.use_minibatch else "minibatch"
-
-    for max_label in config.train_images_per_class:
-        # Egységes K_hop lista
-        K_hops = [None] if not config.use_minibatch else K_hop_list
-        print(K_hops)
-        for K_hop in K_hops:
-
-            init_wandb(config, is_ddp, run_id, K_hop, max_label, mode)
-
-            run_accs = []
-            set_seed(42 + run_id)
-
-            acc = run_training(
-                train_x, train_y,
-                val_x, val_y,
-                test_x_filtered, test_y_filtered,
-                num_class, channel_size,
-                K_hop, max_label,
-                config, device,
-                is_ddp=is_ddp
-            )
-
-            run_accs.append(acc)
-            acc = np.mean(run_accs)
-
-            best_results.append((K_hop, max_label, acc))
+    results = pipeline.run(args.run_id)
 
     if is_main_process():
-        wandb.finish()
-
-    if is_main_process():
-        result_dataset_path = os.path.join(config.results_path, config.dataset_name)
-        if not os.path.isdir(result_dataset_path):
-            os.mkdir(result_dataset_path)
-        results_df = pd.DataFrame(best_results, columns=["K_hop", "max_label", "acc"])
-        file_name = f"{result_dataset_path}/{config.dataset_name}_run{run_id}.csv"
-        results_df.to_csv(file_name, index=False)
-    if is_ddp:
-        dist.destroy_process_group()
+        save_results(results, config, args.run_id)
 
 if __name__ == "__main__":
     main()

@@ -181,7 +181,7 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
-
+/conda/
 #Data
 /data
 /logs
@@ -189,3 +189,4 @@ cython_debug/
 /containers
 /scripts
 /wandb
+

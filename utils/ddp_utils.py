@@ -27,7 +27,11 @@ def setup_device():
         return device, local_rank, is_ddp
 
 def is_main_process():
-    return (not dist.is_initialized()) or (dist.get_rank() == 0)
+    if not dist.is_available():
+        return True
+    if not dist.is_initialized():
+        return True
+    return dist.get_rank() == 0
 
 
 def reduce_value(value, device, average = True):

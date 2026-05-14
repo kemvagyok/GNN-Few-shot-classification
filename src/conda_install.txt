@@ -1,0 +1,3 @@
+module load singularity
+singularity exec --nv --bind ./:/home/$USER/workspace ./containers/fewshotgnn.sif /bin/bash
+PYTHONPATH=$(pwd) python src/main.py -config_fn mnist
