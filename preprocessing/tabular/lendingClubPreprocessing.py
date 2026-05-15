@@ -50,9 +50,6 @@ class LendingClubPreprocessor:
             "title",
             "emp_title",
 
-            # target
-            "loan_status",
-
             # leakage
             "funded_amnt",
             "funded_amnt_inv",
@@ -242,6 +239,7 @@ class LendingClubPreprocessor:
         self.num_cols = [
             c for c in df.columns
             if c not in self.cat_cols
+            and c != "loan_status"
         ]
 
         # -------------------------------------------------
@@ -332,11 +330,16 @@ class LendingClubPreprocessor:
     def transform(self, df):
 
         assert self.fitted, "Call fit first"
+    
 
-
-        # ---------------------------------------------
-        # target BEFORE cleaning
-        # ---------------------------------------------
+        # -----------------------------------------
+        # clean rows
+        # -----------------------------------------
+        df = self._clean_dataframe(df)
+    
+        # -----------------------------------------
+        # target
+        # -----------------------------------------
         y = None
     
         if "loan_status" in df.columns:
@@ -345,11 +348,11 @@ class LendingClubPreprocessor:
                 df["loan_status"] == "Charged Off"
             ).astype(np.float32).values
     
-        # ---------------------------------------------
-        # clean dataframe
-        # ---------------------------------------------
-        df = self._clean_dataframe(df)
-
+            df = df.drop(
+                columns=["loan_status"],
+                errors="ignore"
+            )
+            
         # -------------------------------------------------
         # categorical features
         # -------------------------------------------------
@@ -397,6 +400,7 @@ class LendingClubPreprocessor:
                 errors="coerce"
             )
 
+        #Kitölteni az üres értékeket a mediánnal, hogy a log transzformáció ne dobjon hibát.
         num_df = num_df.fillna(
             num_df.median()
         )
@@ -407,7 +411,7 @@ class LendingClubPreprocessor:
         for col in self.log_cols:
 
             if col in num_df.columns:
-
+                # A log1p használata lehetővé teszi a 0 értékek kezelését anélkül, hogy hibát dobna.
                 num_df[col] = np.log1p(
                     np.maximum(num_df[col], 0)
                 )
@@ -415,6 +419,8 @@ class LendingClubPreprocessor:
         # -------------------------------------------------
         # fix inf / overflow
         # -------------------------------------------------
+        
+        
         num_df = num_df.replace(
             [np.inf, -np.inf],
             np.nan

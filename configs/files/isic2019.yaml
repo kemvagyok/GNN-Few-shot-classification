@@ -6,7 +6,7 @@ paths:
 dataset:
   dataset_type: "image"  # "image", "text"
   dataset_name: "ISIC2019"  # "ISIC2019", "ChestX", "MNIST"
-  train_images_per_class: [1, 2] 
+  train_images_per_class: [1, 2, 5, 10, 20, 50, 100, -1] # -1 means all available images
   img_size : 224
   train_size: 0.8
   test_size: 0.2
@@ -18,7 +18,7 @@ graph:
   K_neigh: 3
   K_hop_list: [1, 2, 3, 4, 5]
   graph_refresh: 20
-  graph_builder: "faiss" # faiss, faiss_gpu, pytorch
+  graph_builder: "faiss_gpu" # faiss, faiss_gpu, pytorch
 
 training:
   train_mode: "full" # "full", "embedding_only"
@@ -33,7 +33,7 @@ training:
   patience: 100
   delta: 0.001
   use_class_weights: true
-  isFreeze: true
+  isFreeze: false
 
 model:
   latens_size: 64

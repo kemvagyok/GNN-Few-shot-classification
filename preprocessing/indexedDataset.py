@@ -24,6 +24,15 @@ class IndexedDataset(torch.utils.data.Dataset):
     
     def get_all(self):
         return self.base.get_all(self.indices)
+
+    def get_batch(self, indices):
+        return self.base.get_all(self.indices)
+        
+    def get_indices(self):
+        return self.indices
     
     def fit(self): # FOR UNSW/tabular datasets
         self.base.fit()
+
+    def memory_usage_mb(self):
+        return self.base.memory_usage_mb()

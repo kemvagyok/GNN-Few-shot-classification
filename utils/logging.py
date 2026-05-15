@@ -8,7 +8,7 @@ def wandb_run(config, is_ddp, run_id, K_hop, max_label):
         yield None
         return
     
-    project_name=f"fewshootgnn_{config.dataset_name}_{'ddp' if is_ddp else 'single'}_{'embedding&GNN' if config.train_mode == 'full' else 'embedding'}"
+    project_name=f"fewshootgnn_{config.dataset_name}_{'ddp' if is_ddp else 'single'}_{'embedding&GNN' if config.train_mode == 'full' else 'embedding'}_{"freezing" if config.isFreeze else "not_freezing"}"
     
     run = wandb.init(
         settings=wandb.Settings(init_timeout=config.wandb_init_timeout),
@@ -37,6 +37,3 @@ def wandb_run(config, is_ddp, run_id, K_hop, max_label):
     finally:
         wandb.finish()
 
-
-def wandb_logging(logs: dict):
-    pass

@@ -37,3 +37,36 @@ class TabularDatasetInMemory(Dataset):
                 },
                 "labels": self.labels[indices]
             }
+
+    def get_inputs(self, indices):
+        return {
+            "x": self.attributes[indices]
+        }
+
+    def get_labels(self, indices):
+        return self.labels[indices]
+        
+    def memory_usage_mb(self):
+        total = 0
+
+        if self.isTransformed:
+            # attributes
+            if torch.is_tensor(self.attributes):
+                total += self.attributes.element_size() * self.attributes.nelement()
+            elif isinstance(self.attributes, np.ndarray):
+                total += self.attributes.nbytes
+
+            # labels
+            if torch.is_tensor(self.labels):
+                total += self.labels.element_size() * self.labels.nelement()
+            elif isinstance(self.labels, np.ndarray):
+                total += self.labels.nbytes
+
+        # df külön (Pandas overhead, csak becslés)
+        if hasattr(self, "df") and self.df is not None:
+            total += self.df.memory_usage(deep=True).sum()
+
+        return {
+            "total_MB": total / 1e6,
+            "total_GB": total / 1e9
+        }

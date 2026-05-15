@@ -36,7 +36,8 @@ class CnnModel(nn.Module):
         x = torch.flatten(x, 1)
         x = self.fc(x)
 
-        x = F.normalize(x, p=2, dim=1)  # L2 normalizálás a latens térben
-
+        if not self.isClassificator: #Ha nem klasszifikátor, hakkor normalizálni kell a GNN-hez.
+            x = F.normalize(x, p=2, dim=1)
+            
         output = x
         return output

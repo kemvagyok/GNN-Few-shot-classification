@@ -43,4 +43,32 @@ class ImageDataset(Dataset):
             },
             "labels": y
         }
-    
+
+    def get_all(self, indices):
+        return {
+        "inputs": {
+            "x": self.images_name[indices]
+        },
+        "labels": self.labels[indices]
+        }
+
+    def memory_usage_mb(self):
+        total = 0
+
+        # labels (torch vagy numpy)
+        if torch.is_tensor(self.labels):
+            total += self.labels.element_size() * self.labels.nelement()
+        elif isinstance(self.labels, np.ndarray):
+            total += self.labels.nbytes
+
+        # images_name (LIST of strings vagy numpy array)
+        if isinstance(self.images_name, np.ndarray):
+            total += self.images_name.nbytes
+        elif isinstance(self.images_name, list):
+            total += sum(len(s.encode("utf-8")) for s in self.images_name)
+
+        return {
+            "labels_MB": total / 1e6,
+            "total_MB": total / 1e6,
+            "total_GB": total / 1e9
+        }

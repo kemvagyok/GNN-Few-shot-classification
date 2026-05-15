@@ -6,7 +6,7 @@ paths:
 dataset:
   dataset_type: "tabular"  # "image", "text", tabular
   dataset_name: "UNSW"  # "UNSW"
-  train_images_per_class: [1, 2] # -1 means using all available images for training
+  train_images_per_class: [-1] # -1 means using all available images for training
   img_size : 0
   train_size: 0.7
   test_size: 0.2
@@ -17,7 +17,7 @@ graph:
   K_neigh: 3
   K_hop_list: [1, 2, 3, 4, 5]
   graph_refresh: 20
-  graph_builder: "faiss" # faiss, faiss_gpu, pytorch
+  graph_builder: "faiss_gpu" # faiss, faiss_gpu, pytorch
 
 training:
   train_mode: "full" # "full", "embedding_only"

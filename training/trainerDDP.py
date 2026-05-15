@@ -143,19 +143,36 @@ class TrainerDDP:
 
         self.embedder.train()
         self.gnn.train()
+        print("asdasdas")
+
+        print(labeled_dataset.memory_usage_mb())
+        print(unlabeled_dataset.memory_usage_mb())
 
         #CPU-n az adatok (x, és y egyaránt)
-        data_labeled = labeled_dataset.get_all()
-        data_unlabeled = unlabeled_dataset.get_all()
+        indices_labeled = labeled_dataset.get_indices()
+        indices_unlabeled = unlabeled_dataset.get_indices()
+
+        indices_labeled = self._split_idx(indices_labeled)
+        indices_unlabeled = self._split_idx(indices_unlabeled)
+        
+        data_labeled = labeled_dataset.get_batch(indices_labeled)
+        data_unlabeled = unlabeled_dataset.get_batch(indices_unlabeled)
+
+        len(data_labeled["labels"]), len(data_unlabeled["labels"])
+
+        print("cxxx")
 
         inputs, y, train_idx, _ = self._merge_datasets(
             data_labeled, data_unlabeled
         )
 
-        with torch.no_grad():
 
+        print(f"HAHAHHAHAAAA RANK: {self.rank}")
+
+        with torch.no_grad():
+            print("LMAOOOOOO")
             #CPU->GPU->CPU
-            embeddings = self._embed_chunked(inputs)
+            embeddings = self._embed_chunked(inputs, chunk_size=64)
 
         # =========================
         # GRAPH BUILD (EPOCH-LEVEL)
@@ -171,7 +188,6 @@ class TrainerDDP:
             )
         print("A", time.time()-start, f"RANK: {self.rank}")
         #-----------------------
-        train_idx = self._split_idx(train_idx)
         self.graph.train_mask = torch.zeros(
             self.graph.num_nodes, 
             dtype=torch.bool
@@ -187,14 +203,12 @@ class TrainerDDP:
             batch_size=self.config.batch_size,
             shuffle=True,
             drop_last=False,
-            num_workers=4,
-            persistent_workers=False,
+            num_workers=8,
+            persistent_workers=True,
             pin_memory=True
         )
         print("B", time.time()-start, f"RANK: {self.rank}")
-        print("train nodes:", len(train_idx))
-        print("batch size:", loader.batch_size)
-        print("loader len:", len(loader))
+
         total_loss = 0
         total_metric = 0
 
@@ -203,7 +217,6 @@ class TrainerDDP:
         for subgraph in loader:
 
             n_id = subgraph.n_id
-            print(n_id)
 
             subgraph = subgraph.to(
                 self.device,
@@ -259,7 +272,6 @@ class TrainerDDP:
         graph.x = self.embedder(**batch_inputs)
 
         outputs = self.gnn(graph)
-
         loss = self.criterion(
             outputs[graph.train_mask],
             graph.y[graph.train_mask]
@@ -317,12 +329,12 @@ class TrainerDDP:
             metric = (preds == y).float().mean()
 
         loss = torch.tensor(loss.item(), device=self.device)
-        metric = torch.tensor(metric.item(), device=self.device)
+        metric = torch.tensor(metric, device=self.device)
 
         loss = self._reduce_mean(loss)
         metric = self._reduce_mean(metric)
 
-        return loss.item(), metric.item()
+        return loss.item(), metric
 
     # =========================
     # EMBEDDING (TRAINABLE)
@@ -352,7 +364,7 @@ class TrainerDDP:
         unlabeled_inputs = unlabeled_data["inputs"]
 
         merged_inputs = {
-            k: torch.cat([labeled_inputs[k], 
+            k: torch.cat([labeled_inputs[k],
                         unlabeled_inputs[k]], dim=0)
             for k in labeled_inputs
         }

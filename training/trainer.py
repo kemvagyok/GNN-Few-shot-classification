@@ -7,6 +7,21 @@ from utils import EarlyStopping
 from preprocessing.indexedDataset import IndexedDataset
 #--------------
 
+def _get_param_snapshot(model):
+    return {
+        name: param.detach().cpu().clone()
+        for name, param in model.named_parameters()
+    }
+
+def _compare_params(old_params, new_model):
+    total_diff = 0.0
+
+    for name, param in new_model.named_parameters():
+        diff = (param.detach().cpu() - old_params[name]).norm().item()
+        total_diff += diff
+
+    return total_diff
+
 class Trainer:
     def __init__(self, embedder, graph_builder, gnn, criterion, config, device, metric_fn=None):
 
@@ -37,12 +52,23 @@ class Trainer:
 
         for epoch in range(self.config.epochs_max):
 
+            prev_embedder_params = _get_param_snapshot(self.embedder)
+
             train_loss, train_metric = self._train_epoch(
                 labeled_dataset = train_dataset, 
                 unlabeled_dataset = val_dataset,
                 epoch = epoch,
                 K_hop = K_hop
                 )
+                
+            param_change = _compare_params(
+                prev_embedder_params,
+                self.embedder
+            )
+
+            print(f"Embedder parameter change: {param_change:.6f}")
+
+            prev_embedder_params = _get_param_snapshot(self.embedder)
 
             if val_dataset is not None:
                 
@@ -90,6 +116,8 @@ class Trainer:
 
         data_labeled = labeled_dataset.get_all()
         data_unlabeled   = unlabeled_dataset.get_all()
+
+        print(len(data_labeled["labels"]), len(data_unlabeled["labels"]))
 
         inputs, y, train_idx, _ = self._merge_datasets(
             data_labeled, data_unlabeled
@@ -221,7 +249,14 @@ class Trainer:
             K_neigh=self.config.K_neigh,
             device=self.device
         )
-
+        print(graph.edge_index.dtype)
+        print(graph.edge_index.min())
+        print(graph.edge_index.max())
+        print(graph.num_nodes)
+        print(graph.edge_index.shape)
+        assert graph.edge_index.dtype == torch.long
+        assert graph.edge_index.min() >= 0
+        assert graph.edge_index.max() < graph.num_nodes
         outputs = self.gnn(graph)
         
         loss = self.criterion(outputs, y)

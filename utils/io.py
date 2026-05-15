@@ -10,5 +10,5 @@ def save_results(results, config, run_id):
     if config.train_mode == "embedding_only":
         file_name = f"{result_dataset_path}/{config.dataset_name}_{config.metrics}_onlyEmbedding_run{run_id}.csv"
     else:
-        file_name = f"{result_dataset_path}/{config.dataset_name}_{config.metrics}__embedding&GNN_run{run_id}.csv"
+        file_name = f"{result_dataset_path}/{config.dataset_name}_{config.metrics}__embedding&GNN_run{run_id}_{ 'frozen' if config.isFreeze else 'unfrozen'}.csv"
     results_df.to_csv(file_name, index=False)

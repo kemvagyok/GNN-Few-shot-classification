@@ -228,17 +228,25 @@ class UNSW_loading:
 class LendingClub_loading:
     def __init__(self, path_raw, **kwargs):
         self.path = path_raw
-        self.csv_accepted_path = os.path.join(self.path, "accepted_2007_to_2018Q4.csv")
+        #self.csv_accepted_path = os.path.join(self.path, "accepted_2007_to_2018Q4.csv")
+        self.csv_accepted_path = os.path.join(self.path, "proba.csv")
         #self.csv_rejected_path = os.path.join(self.path, "rejected_2007_to_2018Q4.csv")
+    
     def load(self):
-        train_df = pd.read_csv(self.csv_accepted_path)
+        train_df = pd.read_csv(self.csv_accepted_path, low_memory=False)
         #test_df  = pd.read_csv(self.csv_rejected_path)
         #df = pd.concat((train_df,test_df))
         df = train_df
 
-        df["label"] = (df["loan_status"] == "Charged Off").astype(int)
-        labels = df['label'].values
-        num_classes = len(df['label'].value_counts())
+        labels = None
+
+        if "loan_status" in df.columns:
+            labels = (
+                df["loan_status"] == "Charged Off"
+            ).astype(np.float32).values
+
+
+        num_classes = len(np.unique_counts(labels))
 
 
         return df, labels, num_classes, None
@@ -259,5 +267,7 @@ def get_dataset_class(name):
         return DBpedia_loading
     elif name == "UNSW":
         return UNSW_loading
+    elif name == "LendingClub":
+        return LendingClub_loading
     else:
         raise ValueError("Unknown dataset: {}".format(name))

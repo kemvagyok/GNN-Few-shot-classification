@@ -1,0 +1,7 @@
+srun --partition=gpu --gres=gpu:4 --cpus-per-task=32 --mem=16G --pty bash
+module load singularity
+singularity exec --nv --bind ./:/home/$USER/workspace ./containers/fewshotgnn.sif /bin/bash
+conda activate /project/c_gnn42/GNN-Few-shot-classification/conda/envs/faiss_env
+export OMP_NUM_THREADS=4
+export CUDA_VISIBLE_DEVICES=0,1,2,3
+PYTHONPATH=$(pwd) torchrun --standalone --nproc_per_node=2 src/main.py -config_fn mnist

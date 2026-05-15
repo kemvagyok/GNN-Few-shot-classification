@@ -13,10 +13,13 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 def setup_device():
     if "LOCAL_RANK" in os.environ:
         # DDP mód
-        dist.init_process_group("nccl")
+        dist.init_process_group(
+            backend="nccl",
+            init_method="env://"
+        )
         local_rank = int(os.environ["LOCAL_RANK"])
         torch.cuda.set_device(local_rank)
-        device = torch.device("cuda", local_rank)
+        device = torch.device(f"cuda:{local_rank}")
         is_ddp = True
         return device, local_rank, is_ddp
     else:

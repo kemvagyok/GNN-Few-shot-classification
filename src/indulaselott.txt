@@ -8,4 +8,4 @@ PYTHONPATH=$(pwd) WANDB_MODE=disabled python src/main.py -config_fn mnist
 module load singularity
 singularity exec --nv --bind ./:/home/$USER/workspace ./containers/fewshotgnn.sif /bin/bash
 conda activate /project/c_gnn42/GNN-Few-shot-classification/conda/envs/faiss_env
-PYTHONPATH=$(pwd) python src/main.py -config_fn mnist
+PYTHONPATH=$(pwd) python src/main.py -config_fn isic2019

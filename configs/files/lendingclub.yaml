@@ -5,7 +5,7 @@ paths:
 
 dataset:
   dataset_type: "tabular"  # "image", "text", tabular
-  dataset_name: "LENDING_CLUB"  # "UNSW", "LENDING_CLUB"
+  dataset_name: "LendingClub"  # "UNSW", "LENDING_CLUB"
   train_images_per_class: [1, 2, 5, 10, 20, 50, 100, -1] # -1 means using all available images for training
   img_size : 0
   train_size: 0.7

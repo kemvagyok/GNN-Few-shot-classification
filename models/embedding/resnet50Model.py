@@ -13,24 +13,14 @@ class Resnet50Model(nn.Module):
 
         resnet = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
 
-        # --- 1) Első Conv módosítása (1 vagy 3 csatorna, tetszőleges inputméret) ---
-        """
-        old_conv = resnet.conv1
-        resnet.conv1 = nn.Conv2d(
-            channel_size,
-            old_conv.out_channels,
-            kernel_size=old_conv.kernel_size,
-            stride=old_conv.stride,
-            padding=old_conv.padding,
-            bias=False
-        )
-        """
         # Ha 1 csatorna esetén a súlyokat is szeretnéd átlagolni:
         if channel_size == 1:
             resnet.conv1.weight.data = resnet.conv1.weight.data.mean(dim=1, keepdim=True)
 
         # --- 2) Fix avgpool helyett AdaptiveAvgPool: bármekkora inputra jó ---
         resnet.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        
+        self.fc = nn.Linear(resnet.fc.in_features, output_dim)
 
         # --- 3) Utolsó FC eltávolítása ---
         self.features = nn.Sequential(*list(resnet.children())[:-1])
@@ -38,7 +28,9 @@ class Resnet50Model(nn.Module):
             for p in self.features.parameters():
                 p.requires_grad = False
 
-        self.fc = nn.Linear(resnet.fc.in_features, output_dim)
+            for p in self.fc.parameters():
+                p.requires_grad = False
+
 
     def forward(self, x):
         x = self.features(x)          # (B, 512, 1, 1)

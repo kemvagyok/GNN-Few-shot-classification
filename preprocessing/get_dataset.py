@@ -46,13 +46,15 @@ def get_dataset(
 
     # ---------------- ISIC ----------------
     if dataset_name == "ISIC2019":
-        images, labels, n_classes, n_channels = ISIC2019Preprocessing().load(
+        images_name, labels, n_classes, n_channels = ISIC2019Preprocessing().load(
             csv_path=os.path.join(data_pth, "raw",dataset_name, "ISIC_2019_Training_GroundTruth.csv"),
             img_dir=os.path.join(data_pth,"raw", dataset_name, "images")
         )
 
         full_dataset = ImageDataset(
-            images_name=images,
+            images_name=images_name,
+            dataset_path=data_pth,
+            dataset_name=dataset_name,
             labels=labels,
             class_num=n_classes,
             n_channels=n_channels,
@@ -70,6 +72,7 @@ def get_dataset(
         test_size=test_size
     )
 
+    input_size = -1 # Csak a tabuláris dataseteknél lesz értelme, a többi esetben a modell fogja kezelni a bemenet méretét
     train_dataset = IndexedDataset(full_dataset, train_idx)
     val_dataset = IndexedDataset(full_dataset, val_idx)
     test_dataset = IndexedDataset(full_dataset, test_idx)
@@ -77,7 +80,8 @@ def get_dataset(
     meta = {
         "class_num": n_classes,
         "labels": labels,
-        "n_channels": n_channels
+        "n_channels": n_channels,
+        "input_size": input_size
     }
 
     return train_dataset, val_dataset, test_dataset, meta

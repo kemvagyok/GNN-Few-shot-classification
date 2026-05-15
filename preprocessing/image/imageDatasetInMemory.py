@@ -33,3 +33,24 @@ class ImageDatasetInMemory(Dataset):
             },
             "labels": self.labels[indices]
         }
+
+    def get_inputs(self, indices):
+        return {
+            "x": self.images[indices]
+        }
+
+    def get_labels(self, indices):
+        return self.labels[indices]
+
+    def memory_usage_mb(self):
+        img_bytes = self.images.element_size() * self.images.nelement()
+        lbl_bytes = self.labels.element_size() * self.labels.nelement()
+
+        total_bytes = img_bytes + lbl_bytes
+
+        return {
+            "images_MB": img_bytes / 1e6,
+            "labels_MB": lbl_bytes / 1e6,
+            "total_MB": total_bytes / 1e6,
+            "total_GB": total_bytes / 1e9
+        }

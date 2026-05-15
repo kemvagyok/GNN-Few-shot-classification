@@ -6,7 +6,7 @@ paths:
 dataset:
   dataset_type: "image"  # "image", "text"
   dataset_name: "MNIST"  # "ISIC2019", "ChestX", "MNIST"
-  train_images_per_class: [1, 2, 5, 10, 20, 50, 100, -1]  # -1 means using all available images for training
+  train_images_per_class: [-1]  # -1 means using all available images for training
   img_size : 28
   train_size: 0.8
   test_size: 0.2
@@ -43,5 +43,5 @@ reproducibility:
   seed: 42
 
 wandb:
-  wandb_mode: 'online' # 'online', 'offline', 'disabled', 'shared'
+  wandb_mode: 'disabled' # 'online', 'offline', 'disabled', 'shared'
   wandb_init_timeout: 150
